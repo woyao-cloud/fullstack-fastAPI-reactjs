@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.department import Department
@@ -71,15 +71,14 @@ class DepartmentRepository:
     async def replace_subtree_paths(
         self, old_prefix: str, new_prefix: str, level_delta: int, root_path: str
     ) -> None:
-        """批量替换子树(含自身)path 前缀并调整 level."""
-        await self.db.execute(
-            update(Department)
-            .where(Department.path.like(f"{root_path}%"))
-            .values(
-                path=func.replace(Department.path, old_prefix, new_prefix),
-                level=Department.level + level_delta,
-            )
+        """批量替换子树(含 root_path 匹配项)的 path 前缀并调整 level(严格前缀替换)."""
+        result = await self.db.execute(
+            select(Department).where(Department.path.like(f"{root_path}%"))
         )
+        for dept in result.scalars().all():
+            dept.path = new_prefix + dept.path[len(old_prefix):]
+            dept.level = dept.level + level_delta
+        await self.db.flush()
 
 
 __all__ = ["DepartmentRepository"]

@@ -95,3 +95,20 @@ async def test_replace_subtree_paths(engine, seed):
         await db.refresh(d2)
         assert d1.path == "/9" and d1.level == 2
         assert d2.path == "/9/2" and d2.level == 3
+
+
+async def test_replace_subtree_paths_multidigit(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        repo = DepartmentRepository(db)
+        # 构造 node_seq 1 和 10,验证 /1 不会误伤 /10
+        d1 = await _seed_dept(db, node_seq=1, name="总部", code="HQ", level=1, path="/1")
+        d10 = await _seed_dept(db, node_seq=10, name="研发", code="RD", level=2, path="/1/10", parent_id=d1.id)
+        d100 = await _seed_dept(db, node_seq=100, name="后端", code="BE", level=3, path="/1/10/100", parent_id=d10.id)
+        await db.commit()
+        await repo.replace_subtree_paths(old_prefix="/1", new_prefix="/9", level_delta=1, root_path="/1")
+        await db.commit()
+        await db.refresh(d1); await db.refresh(d10); await db.refresh(d100)
+        assert d1.path == "/9" and d1.level == 2
+        assert d10.path == "/9/10" and d10.level == 3   # 不被误改为 /9/90
+        assert d100.path == "/9/10/100" and d100.level == 4  # 不被误改为 /9/90/900
