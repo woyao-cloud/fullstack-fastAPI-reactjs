@@ -9,7 +9,7 @@
 | 文档 | 描述 | 关键内容 |
 |------|------|----------|
 | [../SYSTEM_ARCHITECTURE.md](../SYSTEM_ARCHITECTURE.md) | 系统整体架构 | 架构风格、分层设计、组件交互 |
-| [../BACKEND_ARCHITECTURE.md](../BACKEND_ARCHITECTURE.md) | 后端详细架构 | Spring Boot 项目结构、技术栈 |
+| [../BACKEND_ARCHITECTURE.md](../BACKEND_ARCHITECTURE.md) | 后端详细架构 | FastAPI 项目结构、技术栈 |
 | [DATA_FLOW_AND_API.md](./DATA_FLOW_AND_API.md) | 数据流与接口 | API 契约、数据流图、错误码 |
 | [SECURITY_ARCHITECTURE.md](./SECURITY_ARCHITECTURE.md) | 安全架构 | 认证授权、安全机制、数据保护 |
 | [adr/README.md](./adr/README.md) | 架构决策记录 | ADR-001 ~ ADR-007 |
@@ -39,12 +39,12 @@
 │                         ▼                                   │
 │  后端层                                                      │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ Spring Boot 3.5 + JDK 21                            │   │
-│  │ ├─ Spring Security (JWT + OAuth2)                   │   │
-│  │ ├─ Spring Data JPA (Hibernate)                      │   │
-│  │ ├─ Flyway (Database Migration)                      │   │
-│  │ ├─ Jakarta Validation                               │   │
-│  │ └─ JUnit 5 + Testcontainers                         │   │
+│  │ FastAPI + Python 3.12                               │   │
+│  │ ├─ FastAPI security (JWT + OAuth2)                  │   │
+│  │ ├─ SQLAlchemy 2.x async (asyncpg)                   │   │
+│  │ ├─ Alembic (Database Migration)                     │   │
+│  │ ├─ Pydantic Validation                              │   │
+│  │ └─ pytest + Testcontainers                           │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
@@ -68,9 +68,9 @@
 
 | 指标 | 目标 | 说明 |
 |------|------|------|
-| 测试覆盖率 | ≥ 85% | JaCoCo 报告 |
+| 测试覆盖率 | ≥ 85% | pytest-cov 报告 |
 | API 响应时间 | P95 < 200ms | 数据库优化 + 缓存 |
-| 并发用户 | 50,000 峰值 | 虚拟线程 + 水平扩展 |
+| 并发用户 | 50,000 峰值 | 多 worker + 水平扩展 |
 | 安全审计 | 100% 覆盖 | 所有敏感操作记录 |
 
 ---
@@ -113,7 +113,7 @@
 │                                                               │
 │  ┌─────────────────────┐      ┌──────────────────────────┐   │
 │  │   Web 应用          │      │   API 应用               │   │
-│  │   (Next.js)         │◄────►│   (Spring Boot)          │   │
+│  │   (Next.js)         │◄────►│   (FastAPI)              │   │
 │  │                     │      │                          │   │
 │  │  • React 组件       │      │  • REST API              │   │
 │  │  • TypeScript       │      │  • JWT 认证              │   │
@@ -167,4 +167,4 @@ docs/
 
 | 日期 | 版本 | 变更 | 作者 |
 |------|------|------|------|
-| 2024-03-23 | 1.0 | 创建 Spring Boot 架构文档集 | 架构师 |
+| 2024-03-23 | 1.0 | 创建 FastAPI 架构文档集 | 架构师 |

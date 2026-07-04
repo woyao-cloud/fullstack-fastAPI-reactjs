@@ -114,20 +114,20 @@ kubectl apply -f k8s/prod/
 
 ## 数据库管理
 
-### Flyway迁移
+### Alembic迁移
 
-所有环境使用 **Flyway** 统一管理数据库迁移。
+所有环境使用 **Alembic** 统一管理数据库迁移。
 
 | 脚本类型 | 命名规则 | 示例 |
 |----------|----------|------|
-| 版本化迁移 | `V{版本}__{描述}.sql` | `V1__Initial_schema.sql` |
-| 可重复迁移 | `R__{描述}.sql` | `R__Seed_test_data.sql` |
+| 版本化迁移 | `{序号}_{描述}.py` | `0001_initial_schema.py` |
+| 自动生成 | `alembic revision --autogenerate` | 生成 upgrade/downgrade |
 
 ### 数据种子策略
 
 ```
-backend/src/main/resources/db/
-├── migration/           # 表结构（所有环境）
+backend/alembic/
+├── versions/            # 迁移脚本（所有环境）
 ├── data/
 │   ├── local/          # 本地开发数据
 │   ├── team/           # Team开发数据
@@ -219,14 +219,15 @@ docker-compose -f docker-compose.local.yml ps
 docker-compose -f docker-compose.local.yml logs postgres
 ```
 
-**Q: Flyway迁移失败**
+**Q: Alembic迁移失败**
 ```bash
 # 检查迁移状态
-./mvnw flyway:info
+alembic current
+alembic history
 
 # 修复后重新执行
-./mvnw flyway:repair
-./mvnw flyway:migrate
+alembic downgrade -1
+alembic upgrade head
 ```
 
 **Q: 环境数据不一致**

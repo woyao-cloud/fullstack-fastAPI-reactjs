@@ -41,16 +41,16 @@
 
 | 类别 | 技术 | 版本 | 选型理由 |
 |------|------|------|----------|
-| **编程语言** | Java | JDK 21 | LTS版本，虚拟线程支持高并发 |
-| **应用框架** | Spring Boot | 3.5.x | 企业级标准，生态丰富 |
-| **数据访问** | Spring Data JPA | 3.5.x | 简化数据库操作 |
+| **编程语言** | Python | 3.12 | 性能改进，asyncio 原生异步，类型提示成熟 |
+| **应用框架** | FastAPI | 0.115+ | 基于 Starlette/Pydantic，异步高性能 |
+| **数据访问** | SQLAlchemy 2.x (async) + asyncpg | 2.x | 异步 ORM，简化数据库操作 |
 | **数据库** | PostgreSQL | 15+ | JSONB支持，性能优秀 |
 | **缓存** | Redis | 7+ | 高性能分布式缓存 |
-| **消息队列** | Kafka | 3+ | 高吞吐审计日志处理 |
-| **安全框架** | Spring Security | 6.x | 标准安全实现 |
-| **文档生成** | SpringDoc OpenAPI | 2.x | 自动生成API文档 |
-| **数据库迁移** | Flyway | 10.x | 版本化数据库管理 |
-| **构建工具** | Maven | 3.9+ | 依赖管理 |
+| **消息队列** | Kafka (aiokafka) | 3+ | 高吞吐审计日志处理 |
+| **安全框架** | FastAPI security + python-jose + passlib | - | OAuth2/JWT 标准安全实现 |
+| **文档生成** | FastAPI 内置 OpenAPI | - | 自动生成 API 文档（/docs、/openapi.json） |
+| **数据库迁移** | Alembic | 1.x | 版本化数据库管理 |
+| **构建工具** | uv / pip + pyproject.toml | - | 依赖管理 |
 
 ### 2.2 前端技术栈
 
@@ -168,7 +168,7 @@
 
 ```
 usermanagement-backend/
-├── src/main/java/com/usermanagement/
+├── app/
 │   ├── domain/              # 领域层
 │   │   ├── user/            # 用户领域
 │   │   ├── department/      # 部门领域（增强：树形结构）
@@ -301,206 +301,151 @@ UserRepository (仓储接口)
 | **自定义** | CUSTOM | 按条件自定义 | 动态条件生成 |
 
 **数据权限实现**：
-```java
-@Component
-public class DataPermissionInterceptor {
+```python
+class DataPermissionFilter:
 
-    @Autowired
-    private DepartmentService departmentService;
+    def __init__(self, department_service: DepartmentService):
+        self.department_service = department_service
 
-    public Specification<User> applyDataPermission(UserDetails userDetails, String dataScope) {
-        CustomUserDetails user = (CustomUserDetails) userDetails;
+    async def apply_data_permission(
+        self, stmt: select, user: CurrentUser, data_scope: str
+    ) -> select:
+        if data_scope == "ALL":
+            return stmt  # 无过滤
 
-        switch (dataScope) {
-            case "ALL":
-                return null; // 无过滤
+        if data_scope == "DEPT":
+            return await self._create_department_filter(stmt, user.department_id)
 
-            case "DEPT":
-                return createDepartmentFilter(user.getDepartmentId());
+        if data_scope == "SELF":
+            return stmt.where(User.created_by == user.id)
 
-            case "SELF":
-                return (root, query, cb) ->
-                    cb.equal(root.get("createdBy"), user.getId());
+        if data_scope == "CUSTOM":
+            return await self._create_custom_filter(stmt, user.role.data_conditions)
 
-            case "CUSTOM":
-                return createCustomFilter(user.getRole().getDataConditions());
+        raise ValueError(f"未知的数据权限范围: {data_scope}")
 
-            default:
-                throw new IllegalArgumentException("未知的数据权限范围: " + dataScope);
-        }
-    }
-
-    private Specification<User> createDepartmentFilter(UUID departmentId) {
-        return (root, query, cb) -> {
-            List<UUID> accessibleDeptIds = departmentService
-                .getSubDepartmentIds(departmentId);
-            accessibleDeptIds.add(departmentId);
-
-            return root.get("departmentId").in(accessibleDeptIds);
-        };
-    }
-}
+    async def _create_department_filter(self, stmt: select, department_id: UUID) -> select:
+        accessible_dept_ids = await self.department_service.get_sub_department_ids(department_id)
+        accessible_dept_ids.append(department_id)
+        return stmt.where(User.department_id.in_(accessible_dept_ids))
 ```
 
 #### 角色继承管理
 
 **多继承支持**：
-```java
-@Entity
-@Table(name = "role")
-public class Role {
+```python
+class Role(Base):
+    __tablename__ = "role"
 
-    @Id
-    private UUID id;
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True)
+    code: Mapped[str] = mapped_column(unique=True)
+    data_scope: Mapped[DataScope] = mapped_column(default=DataScope.SELF)
 
-    private String name;
-    private String code;
-
-    @Enumerated(EnumType.STRING)
-    private DataScope dataScope;
-
-    @ManyToMany
-    @JoinTable(
-        name = "role_permission",
-        joinColumns = @JoinColumn(name = "role_id"),
-        inverseJoinColumns = @JoinColumn(name = "permission_id")
+    permissions: Mapped[set[Permission]] = relationship(
+        secondary="role_permission", collection_class=set
     )
-    private Set<Permission> permissions = new HashSet<>();
-
-    @ManyToMany
-    @JoinTable(
-        name = "role_inheritance",
-        joinColumns = @JoinColumn(name = "child_role_id"),
-        inverseJoinColumns = @JoinColumn(name = "parent_role_id")
+    parent_roles: Mapped[set["Role"]] = relationship(
+        secondary="role_inheritance",
+        primaryjoin="Role.id == role_inheritance.c.child_role_id",
+        secondaryjoin="Role.id == role_inheritance.c.parent_role_id",
+        collection_class=set,
     )
-    private Set<Role> parentRoles = new HashSet<>();
 
-    // 获取所有权限（包括继承的）
-    public Set<Permission> getAllPermissions() {
-        Set<Permission> allPermissions = new HashSet<>(this.permissions);
-
-        for (Role parent : parentRoles) {
-            allPermissions.addAll(parent.getAllPermissions());
-        }
-
-        return allPermissions;
-    }
-}
+    def get_all_permissions(self) -> set[Permission]:
+        all_permissions: set[Permission] = set(self.permissions)
+        for parent in self.parent_roles:
+            all_permissions |= parent.get_all_permissions()
+        return all_permissions
 ```
 
 **循环继承检测**：
-```java
-@Service
-public class RoleService {
+```python
+class RoleService:
+    def __init__(self, role_repo: RoleRepository, cache: PermissionCache):
+        self.role_repo = role_repo
+        self.cache = cache
 
-    public void addParentRole(UUID childRoleId, UUID parentRoleId) {
-        // 检查是否形成循环
-        if (isCircularInheritance(childRoleId, parentRoleId)) {
-            throw new BusinessException("不能形成循环继承关系");
-        }
+    async def add_parent_role(self, child_role_id: UUID, parent_role_id: UUID) -> None:
+        # 检查是否形成循环
+        if await self._is_circular_inheritance(child_role_id, parent_role_id):
+            raise BusinessException("不能形成循环继承关系")
 
-        Role child = roleRepository.findById(childRoleId).orElseThrow();
-        Role parent = roleRepository.findById(parentRoleId).orElseThrow();
+        child = await self.role_repo.get_or_404(child_role_id)
+        parent = await self.role_repo.get_or_404(parent_role_id)
+        child.parent_roles.add(parent)
+        await self.role_repo.save(child)
 
-        child.getParentRoles().add(parent);
-        roleRepository.save(child);
+        # 清除相关用户的权限缓存
+        await self.cache.clear_user_permission(child_role_id)
 
-        // 清除相关用户的权限缓存
-        clearUserPermissionCache(childRoleId);
-    }
+    async def _is_circular_inheritance(self, start_role_id: UUID, target_role_id: UUID) -> bool:
+        if start_role_id == target_role_id:
+            return True
 
-    private boolean isCircularInheritance(UUID startRoleId, UUID targetRoleId) {
-        if (startRoleId.equals(targetRoleId)) {
-            return true;
-        }
+        visited: set[UUID] = set()
+        queue: deque[UUID] = deque([target_role_id])
 
-        Role targetRole = roleRepository.findById(targetRoleId).orElseThrow();
-        Set<Role> visited = new HashSet<>();
-        Queue<Role> queue = new LinkedList<>();
-        queue.add(targetRole);
+        while queue:
+            current_id = queue.popleft()
+            if current_id in visited:
+                continue
+            visited.add(current_id)
 
-        while (!queue.isEmpty()) {
-            Role current = queue.poll();
-            if (visited.contains(current)) {
-                continue;
-            }
-            visited.add(current);
+            if current_id == start_role_id:
+                return True
 
-            if (current.getId().equals(startRoleId)) {
-                return true;
-            }
+            current = await self.role_repo.get_or_404(current_id)
+            queue.extend(p.id for p in current.parent_roles)
 
-            queue.addAll(current.getParentRoles());
-        }
-
-        return false;
-    }
-}
+        return False
 ```
 
 #### 权限模板机制
 
 **权限模板实体**：
-```java
-@Entity
-@Table(name = "permission_template")
-public class PermissionTemplate {
+```python
+class PermissionTemplate(Base):
+    __tablename__ = "permission_template"
 
-    @Id
-    private UUID id;
-
-    private String name;
-    private String code;
-    private String description;
-
-    @Enumerated(EnumType.STRING)
-    private TemplateType type; // DEPARTMENT_MANAGER, END_USER, AUDITOR等
-
-    @ManyToMany
-    @JoinTable(
-        name = "template_permission",
-        joinColumns = @JoinColumn(name = "template_id"),
-        inverseJoinColumns = @JoinColumn(name = "permission_id")
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column()
+    code: Mapped[str] = mapped_column()
+    description: Mapped[str | None] = mapped_column()
+    type: Mapped[TemplateType] = mapped_column()  # DEPARTMENT_MANAGER, END_USER, AUDITOR 等
+    permissions: Mapped[set[Permission]] = relationship(
+        secondary="template_permission", collection_class=set
     )
-    private Set<Permission> permissions = new HashSet<>();
-
-    @Enumerated(EnumType.STRING)
-    private DataScope defaultDataScope;
-
-    private String version;
-    private boolean isActive = true;
-}
+    default_data_scope: Mapped[DataScope] = mapped_column()
+    version: Mapped[str] = mapped_column()
+    is_active: Mapped[bool] = mapped_column(default=True)
 ```
 
 **应用模板创建角色**：
-```java
-@Service
-public class TemplateService {
+```python
+class TemplateService:
+    def __init__(self, template_repo: TemplateRepository, role_repo: RoleRepository):
+        self.template_repo = template_repo
+        self.role_repo = role_repo
 
-    @Transactional
-    public Role createRoleFromTemplate(CreateRoleFromTemplateRequest request) {
-        PermissionTemplate template = templateRepository
-            .findByCodeAndActiveTrue(request.getTemplateCode())
-            .orElseThrow(() -> new TemplateNotFoundException(request.getTemplateCode()));
+    async def create_role_from_template(self, request: CreateRoleFromTemplateRequest) -> Role:
+        template = await self.template_repo.find_by_code_and_active(request.template_code)
+        if template is None:
+            raise TemplateNotFoundException(request.template_code)
 
-        Role role = new Role();
-        role.setName(request.getRoleName());
-        role.setCode(generateRoleCode(request.getRoleName()));
-        role.setDataScope(template.getDefaultDataScope());
-        role.setPermissions(new HashSet<>(template.getPermissions()));
+        permissions: set[Permission] = set(template.permissions)
+        if request.additional_permissions:
+            permissions |= set(request.additional_permissions)
+        if request.excluded_permissions:
+            permissions -= set(request.excluded_permissions)
 
-        // 可选的权限调整
-        if (request.getAdditionalPermissions() != null) {
-            role.getPermissions().addAll(request.getAdditionalPermissions());
-        }
-
-        if (request.getExcludedPermissions() != null) {
-            role.getPermissions().removeAll(request.getExcludedPermissions());
-        }
-
-        return roleRepository.save(role);
-    }
-}
+        role = Role(
+            name=request.role_name,
+            code=self._generate_role_code(request.role_name),
+            data_scope=template.default_data_scope,
+            permissions=permissions,
+        )
+        return await self.role_repo.save(role)
 ```
 
 #### 权限检查流程
@@ -558,49 +503,43 @@ CREATE INDEX idx_department_status ON department(status);
 #### 核心操作实现
 
 **查询子树**：
-```java
-@Service
-public class DepartmentService {
+```python
+class DepartmentService:
 
-    @Cacheable(value = "departmentSubtree", key = "#rootId")
-    public List<DepartmentDTO> getSubtree(UUID rootId) {
-        String path = departmentRepository.findPathById(rootId);
-        return departmentRepository.findByPathStartingWith(path + "/");
-    }
+    @cached("departmentSubtree", key=lambda self, root_id: root_id)
+    async def get_subtree(self, root_id: UUID) -> list[DepartmentDTO]:
+        path = await self.department_repo.find_path_by_id(root_id)
+        return await self.department_repo.find_by_path_starting_with(path + "/")
 
-    public List<UUID> getSubDepartmentIds(UUID departmentId) {
-        String path = departmentRepository.findPathById(departmentId);
-        return departmentRepository.findIdsByPathStartingWith(path + "/");
-    }
-}
+    async def get_sub_department_ids(self, department_id: UUID) -> list[UUID]:
+        path = await self.department_repo.find_path_by_id(department_id)
+        return await self.department_repo.find_ids_by_path_starting_with(path + "/")
 ```
 
 **更新部门层级**：
-```java
-@Transactional
-public DepartmentDTO updateDepartmentParent(UUID departmentId, UUID newParentId) {
-    // 1. 检查循环依赖
-    if (isCircularDependency(departmentId, newParentId)) {
-        throw new BusinessException("不能形成循环依赖");
-    }
+```python
+    async def update_department_parent(self, department_id: UUID, new_parent_id: UUID) -> DepartmentDTO:
+        async with self.session.begin():
+            # 1. 检查循环依赖
+            if await self._is_circular_dependency(department_id, new_parent_id):
+                raise BusinessException("不能形成循环依赖")
 
-    // 2. 获取旧路径和新路径
-    String oldPath = departmentRepository.findPathById(departmentId);
-    String newParentPath = departmentRepository.findPathById(newParentId);
-    String newPath = newParentPath + "/" + departmentId;
+            # 2. 获取旧路径和新路径
+            old_path = await self.department_repo.find_path_by_id(department_id)
+            new_parent_path = await self.department_repo.find_path_by_id(new_parent_id)
+            new_path = f"{new_parent_path}/{department_id}"
 
-    // 3. 更新当前部门
-    departmentRepository.updatePath(departmentId, newPath);
+            # 3. 更新当前部门
+            await self.department_repo.update_path(department_id, new_path)
 
-    // 4. 更新所有子部门的路径
-    departmentRepository.updateSubtreePaths(oldPath, newPath);
+            # 4. 更新所有子部门的路径
+            await self.department_repo.update_subtree_paths(old_path, new_path)
 
-    // 5. 清除缓存
-    cacheManager.evict("departmentTree");
-    cacheManager.evict("departmentSubtree:*");
+        # 5. 清除缓存
+        await self.cache.evict("departmentTree")
+        await self.cache.evict_pattern("departmentSubtree:*")
 
-    return getDepartment(departmentId);
-}
+        return await self.get_department(department_id)
 ```
 
 #### 部门层级规则
@@ -712,68 +651,56 @@ performance:
 #### 配置管理实现
 
 **配置服务**：
-```java
-@Service
-public class ConfigService {
+```python
+class ConfigService:
 
-    @Cacheable(value = "systemConfig", key = "#configKey")
-    public String getConfigValue(String configKey) {
-        SystemConfig config = configRepository.findByConfigKey(configKey)
-            .orElseThrow(() -> new ConfigNotFoundException(configKey));
+    @cached("systemConfig", key=lambda self, config_key: config_key)
+    async def get_config_value(self, config_key: str) -> str:
+        config = await self.config_repo.find_by_config_key(config_key)
+        if config is None:
+            raise ConfigNotFoundException(config_key)
 
-        if (config.isEncrypted()) {
-            return decrypt(config.getConfigValue());
-        }
-        return config.getConfigValue();
-    }
+        if config.is_encrypted:
+            return self.crypto.decrypt(config.config_value)
+        return config.config_value
 
-    @CacheEvict(value = "systemConfig", key = "#configKey")
-    @Transactional
-    public void updateConfig(String configKey, String value, UUID userId) {
-        SystemConfig config = configRepository.findByConfigKey(configKey)
-            .orElseGet(() -> new SystemConfig(configKey));
+    async def update_config(self, config_key: str, value: str, user_id: UUID) -> None:
+        async with self.session.begin():
+            config = await self.config_repo.find_by_config_key(config_key)
+            if config is None:
+                config = SystemConfig(config_key=config_key)
 
-        if (config.isEncrypted()) {
-            config.setConfigValue(encrypt(value));
-        } else {
-            config.setConfigValue(value);
-        }
+            if config.is_encrypted:
+                config.config_value = self.crypto.encrypt(value)
+            else:
+                config.config_value = value
 
-        config.setUpdatedBy(userId);
-        configRepository.save(config);
+            config.updated_by = user_id
+            await self.config_repo.save(config)
 
-        // 发布配置变更事件
-        eventPublisher.publishEvent(new ConfigChangedEvent(configKey, value));
-    }
-}
+        # 发布配置变更事件
+        await self.event_bus.publish(ConfigChangedEvent(config_key, value))
+        # 清除缓存
+        await self.cache.evict("systemConfig", config_key)
 ```
 
 **动态安全策略应用**：
-```java
-@Configuration
-@ConfigurationProperties(prefix = "security.policy")
-@RefreshScope
-public class SecurityPolicyConfig {
+```python
+# 通过 pydantic-settings 加载，运行时由 Redis 配置订阅热重载
+class SecurityPolicySettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="security_policy_")
+    password: PasswordPolicy = PasswordPolicy()
+    login: LoginPolicy = LoginPolicy()
 
-    private PasswordPolicy passwordPolicy;
-    private LoginPolicy loginPolicy;
+@lru_cache(maxsize=1)
+def security_policy() -> SecurityPolicySettings:
+    return SecurityPolicySettings()
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(passwordPolicy.getStrength());
-    }
-
-    @Bean
-    public AuthenticationManager authenticationManager(
-            UserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
-        provider.setPasswordEncoder(passwordEncoder);
-        provider.setHideUserNotFoundExceptions(false);
-        return new ProviderManager(Collections.singletonList(provider));
-    }
-}
+@lru_cache(maxsize=1)
+def pwd_context() -> CryptContext:
+    # passlib BCrypt，强度由动态配置驱动，配置变更时清除缓存重建
+    policy = security_policy().password
+    return CryptContext(schemes=["bcrypt"], bcrypt__rounds=policy.strength)
 ```
 
 ### 4.6 审计日志模块（增强）
@@ -787,7 +714,7 @@ public class SecurityPolicyConfig {
 
 #### 日志架构增强
 ```
-操作发生 → AOP拦截器 → 日志收集 → Kafka Topic
+操作发生 → FastAPI 中间件/装饰器 → 日志收集 → Kafka Topic
                                          ↓
                               Log Consumer Service
                                          ↓
@@ -798,61 +725,50 @@ public class SecurityPolicyConfig {
 ```
 
 #### 日志导出服务
-```java
-@Service
-public class AuditLogExportService {
+```python
+class AuditLogExportService:
 
-    @Async
-    public ExportTask exportLogs(ExportRequest request, UUID userId) {
-        // 1. 创建导出任务
-        ExportTask task = createExportTask(request, userId);
+    async def export_logs(self, request: ExportRequest, user_id: UUID) -> ExportTask:
+        # 1. 创建导出任务
+        task = await self._create_export_task(request, user_id)
 
-        // 2. 异步查询数据
-        List<AuditLog> logs = auditLogRepository.findByCriteria(request);
+        # 后台任务异步执行（FastAPI BackgroundTasks / asyncio.Task）
+        asyncio.create_task(self._run_export(task, request))
+        return task
 
-        // 3. 生成导出文件
-        byte[] fileContent;
-        switch (request.getFormat()) {
-            case EXCEL:
-                fileContent = generateExcel(logs);
-                break;
-            case PDF:
-                fileContent = generatePdf(logs);
-                break;
-            case CSV:
-                fileContent = generateCsv(logs);
-                break;
-            default:
-                throw new UnsupportedFormatException(request.getFormat());
-        }
+    async def _run_export(self, task: ExportTask, request: ExportRequest) -> None:
+        # 2. 异步查询数据
+        logs = await self.audit_log_repo.find_by_criteria(request)
 
-        // 4. 保存到文件存储
-        String fileUrl = fileStorageService.saveExportFile(task.getId(), fileContent);
+        # 3. 生成导出文件
+        match request.format:
+            case ExportFormat.EXCEL:
+                file_content = self._generate_excel(logs)
+            case ExportFormat.PDF:
+                file_content = self._generate_pdf(logs)
+            case ExportFormat.CSV:
+                file_content = self._generate_csv(logs)
+            case _:
+                raise UnsupportedFormatException(request.format)
 
-        // 5. 更新任务状态
-        task.complete(fileUrl);
-        return taskRepository.save(task);
-    }
-}
+        # 4. 保存到文件存储
+        file_url = await self.file_storage.save_export_file(task.id, file_content)
+
+        # 5. 更新任务状态
+        task.complete(file_url)
+        await self.task_repo.save(task)
 ```
 
 #### 个人登录历史
-```java
-@RestController
-@RequestMapping("/api/v1/users/me")
-public class UserProfileController {
-
-    @GetMapping("/login-history")
-    @PreAuthorize("isAuthenticated()")
-    public Page<LoginHistoryDTO> getLoginHistory(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-
-        UUID userId = ((CustomUserDetails) userDetails).getId();
-        return auditLogService.getUserLoginHistory(userId, page, size);
-    }
-}
+```python
+@router.get("/api/v1/users/me/login-history")
+async def get_login_history(
+    user: CurrentUser = Depends(get_current_user),
+    page: int = Query(0, ge=0),
+    size: int = Query(20, le=100),
+    audit_log_service: AuditLogService = Depends(),
+) -> Page[LoginHistoryDTO]:
+    return await audit_log_service.get_user_login_history(user.id, page, size)
 ```
 
 ---
@@ -887,7 +803,7 @@ SystemConfig (系统配置)
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Client    │────►│  API Server │────►│   Redis     │
-│   (Browser) │     │  (Spring Boot)│    │  (Cache)    │
+│   (Browser) │     │  (FastAPI)     │    │  (Cache)    │
 └─────────────┘     └──────┬──────┘     └─────────────┘
                            │
           ┌────────────────┼────────────────┐
@@ -909,7 +825,7 @@ SystemConfig (系统配置)
 
 | 缓存级别 | 存储内容 | TTL | 更新策略 |
 |----------|----------|-----|----------|
-| **L1: Local Cache** | 热点数据 | 5分钟 | Caffeine |
+| **L1: Local Cache** | 热点数据 | 5分钟 | cachetools |
 | **L2: Redis** | 用户权限、会话 | 15分钟-7天 | 主动更新 |
 | **L3: Database** | 持久化数据 | 永久 | - |
 
@@ -1110,7 +1026,7 @@ GET /api/v1/users?page=1&size=20&sort=createdAt,desc
                     ▼
             ┌───────────────┐
             │提取用户信息    │
-            │注入SecurityContext
+            │注入请求上下文
             └───────┬───────┘
                     │
                     ▼
@@ -1126,18 +1042,26 @@ GET /api/v1/users?page=1&size=20&sort=createdAt,desc
 ### 7.2 授权架构
 
 #### RBAC 实现
-```java
-// 权限检查注解
-@PreAuthorize("hasPermission('user:create')")
-public User createUser(CreateUserRequest request) {
-    // ...
-}
+```python
+# 权限检查依赖：通过 FastAPI 依赖注入校验权限
+async def require_permission(code: str, user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    if not await user.has_permission(code):
+        raise ForbiddenException(f"缺少权限: {code}")
+    return user
 
-// 数据权限过滤
-@PostFilter("hasDataPermission(filterObject, 'DEPT')")
-public List<User> listUsers(Department dept) {
-    // ...
-}
+@router.post("/users", response_model=UserDTO)
+async def create_user(
+    request: CreateUserRequest,
+    user: CurrentUser = Depends(require_permission("user:create")),
+    user_service: UserService = Depends(),
+) -> UserDTO:
+    return await user_service.create_user(request)
+
+# 数据权限过滤：在 Service 层对 select 语句叠加过滤条件
+async def list_users(dept: Department, user: CurrentUser, dept_filter: DataPermissionFilter = Depends()):
+    stmt = select(User)
+    stmt = await dept_filter.apply_data_permission(stmt, user, DataScope.DEPT)
+    return await user_repo.execute(stmt)
 ```
 
 ### 7.3 安全防护
@@ -1148,9 +1072,9 @@ public List<User> listUsers(Department dept) {
 | **重放攻击** | Token唯一性 | JWT jti + 黑名单检查 |
 | **CSRF攻击** | CSRF Token | SameSite Cookie + Token验证 |
 | **XSS攻击** | 输入过滤 | 输出编码 + Content Security Policy |
-| **SQL注入** | 参数化查询 | JPA + PreparedStatement |
+| **SQL注入** | 参数化查询 | SQLAlchemy 参数化查询 |
 | **敏感数据泄露** | 加密存储 | AES-256加密敏感字段 |
-| **越权访问** | 权限校验 | 方法级安全注解 |
+| **越权访问** | 权限校验 | 路由级依赖注入校验 |
 | **会话劫持** | 会话绑定 | IP + UserAgent绑定检查 |
 
 ### 7.4 加密策略
@@ -1183,7 +1107,7 @@ public List<User> listUsers(Department dept) {
 
 | 服务 | 镜像 | 端口 | 内存限制 | CPU限制 |
 |------|------|------|----------|---------|
-| app | usermanagement/app | 8080 | 2GB | 1核 |
+| app | usermanagement/app | 8000 | 1GB | 1核 |
 | nginx | nginx:alpine | 80/443 | 256MB | 0.5核 |
 | postgres | postgres:15 | 5432 | 4GB | 2核 |
 | redis | redis:7-alpine | 6379 | 1GB | 0.5核 |
@@ -1192,19 +1116,22 @@ public List<User> listUsers(Department dept) {
 #### Dockerfile 示例
 ```dockerfile
 # 多阶段构建
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM python:3.12-slim AS builder
 WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN ./mvnw clean package -DskipTests
+ENV UV_SYSTEM_PYTHON=1
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-install-project
+COPY app ./app
 
-FROM eclipse-temurin:21-jre-alpine
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+FROM python:3.12-slim
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder /app /app
+ENV PATH="/app/.venv/bin:$PATH"
 USER appuser
-EXPOSE 8080
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"
+ENTRYPOINT ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]
 ```
 
 ### 8.2 Kubernetes 部署
@@ -1287,37 +1214,37 @@ spec:
 └─────────────────────────────────────────────────────────────┘
 
 1. 连接池优化
-   - HikariCP: max pool size = 50, min idle = 10
-   - connection timeout = 5s, idle timeout = 10min
-   - validation query: SELECT 1
+   - SQLAlchemy async + asyncpg: pool size = 50, max overflow = 10
+   - pool timeout = 5s, pool recycle = 10min
+   - pool_pre_ping: 保持连接活性
 
 2. Redis优化
-   - Lettuce连接池: pool size = 100
+   - redis-py async 连接池: max connections = 100
    - Pipeline批量操作: 登录计数 + 会话存储 + 权限缓存
    - 集群模式: 读写分离，主从架构
-   - 本地缓存: Caffeine二级缓存热点数据
+   - 本地缓存: cachetools 二级缓存热点数据
 
 3. JWT生成优化
    - 预生成RSA密钥对 (启动时加载到内存)
-   - 使用线程安全的JWT库
+   - 复用 python-jose 编码器
    - 缓存生成的Token签名
 
 4. 审计日志异步化
-   - Kafka缓冲: 高吞吐量，顺序写入
+   - aiokafka缓冲: 高吞吐量，顺序写入
    - 批量消费: 每批1000条，减少数据库写入次数
    - 失败重试: 指数退避重试机制
 
 5. 数据库优化
    - 用户表索引: email (唯一), status, department_id
    - 分区表: 审计日志按月分区，登录日志按日分区
-   - 查询优化: EntityGraph避免N+1问题
+   - 查询优化: selectinload/joinedload避免N+1问题
    - 读写分离: 登录验证走主库，权限查询走从库
 
-6. JVM优化
-   - G1GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=200
-   - Heap: -Xms4g -Xmx4g (根据实际内存调整)
-   - Metaspace: -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=1g
-   - 虚拟线程: -Dspring.threads.virtual.enabled=true
+6. 进程与事件循环优化
+   - uvloop: 替换默认 asyncio 事件循环，降低 IO 延迟
+   - gunicorn 多 worker: 每核 1-2 个 worker 进程水平扩展
+   - worker 内存上限 + --max-requests 重启防内存增长
+   - CPU 密集任务移至进程池，避免阻塞事件循环
 
 7. 网络优化
    - HTTP/2: 减少连接建立开销
@@ -1361,86 +1288,59 @@ spec:
 #### 具体优化实现
 
 **Redis Pipeline优化**：
-```java
-@Service
-public class LoginService {
+```python
+class LoginService:
 
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
+    def __init__(self, redis: Redis, user_repo: UserRepository, jwt: JWTService):
+        self.redis = redis
+        self.user_repo = user_repo
+        self.jwt = jwt
 
-    public LoginResponse login(LoginRequest request) {
-        // 使用Pipeline批量操作Redis
-        List<Object> results = redisTemplate.executePipelined(
-            new RedisCallback<Object>() {
-                @Override
-                public Object doInRedis(RedisConnection connection) {
-                    // 1. 获取登录失败计数
-                    connection.get(("login:failed:" + request.getEmail()).getBytes());
+    async def login(self, request: LoginRequest) -> LoginResponse:
+        # 使用 Pipeline 批量操作 Redis
+        async with self.redis.pipeline(transaction=False) as pipe:
+            # 1. 获取登录失败计数
+            pipe.get(f"login:failed:{request.email}")
+            # 2. 存储会话信息
+            pipe.setex(f"session:{user_id}:{session_id}", 900, jwt_token)
+            # 3. 缓存用户权限 + 设置过期
+            pipe.sadd(f"user:permissions:{user_id}", *[p.code for p in permissions])
+            pipe.expire(f"user:permissions:{user_id}", 300)
+            results = await pipe.execute()
 
-                    // 2. 存储会话信息
-                    String sessionKey = "session:" + userId + ":" + sessionId;
-                    connection.setEx(sessionKey.getBytes(), 900, jwtToken.getBytes());
-
-                    // 3. 缓存用户权限
-                    String permissionKey = "user:permissions:" + userId;
-                    connection.sAdd(permissionKey.getBytes(),
-                        permissions.stream().map(p -> p.getCode().getBytes()).toArray(byte[][]::new));
-                    connection.expire(permissionKey.getBytes(), 300);
-
-                    return null;
-                }
-            }
-        );
-
-        // 处理Pipeline结果
-        Integer failedCount = (Integer) results.get(0);
-        // ... 其他结果处理
-    }
-}
+        failed_count = int(results[0] or 0)
+        # ... 其他结果处理
 ```
 
 **异步日志处理**：
-```java
-@Component
-public class AuditLogAspect {
+```python
+class AuditLogHandler:
 
-    @Autowired
-    private KafkaTemplate<String, AuditLogEvent> kafkaTemplate;
+    def __init__(self, producer: aiokafka.AIOKafkaProducer, executor: ThreadPoolExecutor):
+        self.producer = producer
+        self.executor = executor
 
-    @Async("auditLogExecutor")
-    @EventListener
-    public void handleLoginEvent(LoginSuccessEvent event) {
-        AuditLogEvent logEvent = AuditLogEvent.builder()
-            .userId(event.getUserId())
-            .operation("LOGIN")
-            .resourceType("USER")
-            .resourceId(event.getUserId())
-            .clientIp(event.getClientIp())
-            .userAgent(event.getUserAgent())
-            .success(true)
-            .timestamp(Instant.now())
-            .build();
+    async def handle_login_event(self, event: LoginSuccessEvent) -> None:
+        log_event = AuditLogEvent(
+            user_id=event.user_id,
+            operation="LOGIN",
+            resource_type="USER",
+            resource_id=event.user_id,
+            client_ip=event.client_ip,
+            user_agent=event.user_agent,
+            success=True,
+            timestamp=datetime.utcnow(),
+        )
+        # 发送到 Kafka，不阻塞主线程
+        await self.producer.send_and_wait("audit-log", log_event.model_dump_json())
 
-        // 发送到Kafka，不阻塞主线程
-        kafkaTemplate.send("audit-log", logEvent);
-    }
-}
 
-@Configuration
-public class AsyncConfig {
-
-    @Bean("auditLogExecutor")
-    public Executor auditLogExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(5);
-        executor.setMaxPoolSize(20);
-        executor.setQueueCapacity(10000);
-        executor.setThreadNamePrefix("audit-log-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.initialize();
-        return executor;
-    }
-}
+# 线程池配置（用于 CPU 密集型或阻塞型后台任务）
+def build_audit_executor() -> ThreadPoolExecutor:
+    return ThreadPoolExecutor(
+        max_workers=20,
+        thread_name_prefix="audit-log-",
+    )
 ```
 
 #### 性能监控与调优
@@ -1476,7 +1376,7 @@ metrics:
 | 用户权限查询 | Redis缓存 + 本地缓存 | 从DB 50ms → 本地5ms |
 | 部门树查询 | Redis缓存 + 预加载 | 从递归查询100ms → 缓存1ms |
 | 登录会话 | Redis + Session共享 | 支持水平扩展 |
-| 热点用户 | Caffeine本地缓存 | 减少Redis压力 |
+| 热点用户 | cachetools 本地缓存 | 减少Redis压力 |
 
 ### 9.3 数据库优化
 
@@ -1515,7 +1415,7 @@ CREATE INDEX idx_dept_parent ON department(parent_id);
 
 #### 监控架构
 ```
-Application ──► Micrometer ──► Prometheus ──► Grafana
+Application ──► prometheus_client ──► Prometheus ──► Grafana
                      │
                      ▼
                AlertManager ──► 邮件/短信/钉钉

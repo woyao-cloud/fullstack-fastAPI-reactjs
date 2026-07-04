@@ -40,9 +40,9 @@ npm run build
 
 ### 代码风格配置
 
-- **Java**: Google Java Style Guide
-- **IDE**: 配置 IDE 自动格式化 (IntelliJ IDEA / VS Code)
-- **Checkstyle**: 使用 `checkstyle.xml` 配置文件
+- **Python**: PEP 8 + ruff + black + isort
+- **IDE**: 配置 IDE 自动格式化 (VS Code / PyCharm)
+- **ruff**: 使用 `pyproject.toml` 中 `[tool.ruff]` 配置
 
 ## 发布流程
 

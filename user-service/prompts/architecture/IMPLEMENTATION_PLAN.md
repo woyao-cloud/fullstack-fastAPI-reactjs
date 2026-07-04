@@ -1,8 +1,8 @@
 # 架构实施计划
 # 用户角色权限管理系统
 
-**计划版本**: 1.0
-**日期**: 2026-03-27
+**计划版本**: 1.1
+**日期**: 2026-07-04
 **编写人**: 系统架构师
 **依据**: FRD v1.2, NFRD v1.0, SYSTEM_ARCHITECTURE.md v1.1
 
@@ -11,7 +11,7 @@
 ## 1. 计划概述
 
 ### 1.1 目标
-基于更新的架构设计（v1.1），制定详细的实施计划，确保系统满足FRD v1.2的所有功能需求和非功能需求。
+基于更新的架构设计（v1.1），制定详细的实施计划，确保系统满足FRD v1.2的所有功能需求和非功能需求。后端技术栈为 **FastAPI + Python 3.12 + SQLAlchemy + Alembic**。
 
 ### 1.2 范围
 - 部门管理模块（五级树形结构）
@@ -44,12 +44,12 @@
 1. **数据库设计** (3天)
    - 创建所有表结构（用户、角色、权限、部门、配置等）
    - 设计索引和约束
-   - 编写Flyway迁移脚本
+   - 编写Alembic迁移脚本
 
 2. **项目骨架** (4天)
-   - Spring Boot项目初始化
+   - FastAPI 项目初始化（分层目录 app/api/services/repositories/domain）
    - 多模块结构划分
-   - 基础依赖配置（Spring Security, JPA, Redis等）
+   - 基础依赖配置（FastAPI security、SQLAlchemy async、Redis、aiokafka等）
 
 3. **开发环境** (3天)
    - Docker Compose环境（PostgreSQL, Redis, Kafka）
@@ -58,7 +58,7 @@
 
 4. **基础功能** (4天)
    - 用户CRUD基础实现
-   - JWT认证基础实现
+   - JWT认证基础实现（python-jose + passlib）
    - 基础权限控制
 
 #### 交付物
@@ -74,12 +74,12 @@
 
 #### 任务清单
 1. **部门实体设计** (2天)
-   - Department实体实现（Materialized Path模式）
-   - Repository接口设计
+   - Department SQLAlchemy 模型（Materialized Path 模式）
+   - Repository 接口设计
    - 部门树查询方法
 
 2. **部门服务层** (3天)
-   - DepartmentService核心逻辑
+   - DepartmentService 核心逻辑
    - 部门树构建算法
    - 层级调整逻辑（防循环依赖）
 
@@ -89,9 +89,9 @@
    - 部门成员管理接口
 
 4. **部门缓存** (2天)
-   - Redis部门树缓存
+   - Redis 部门树缓存
    - 缓存失效策略
-   - 本地缓存优化
+   - 本地缓存优化（cachetools）
 
 5. **前端界面** (3天)
    - 部门树形展示组件
@@ -99,7 +99,7 @@
    - 拖拽调整功能
 
 #### 技术挑战
-- Materialized Path模式的更新性能优化
+- Materialized Path 模式的更新性能优化
 - 部门树缓存一致性
 - 前端树形组件性能
 
@@ -115,17 +115,17 @@
 
 #### 任务清单
 1. **配置数据模型** (2天)
-   - SystemConfig实体设计
-   - ConfigHistory审计表
-   - EmailTemplate邮件模板
+   - SystemConfig SQLAlchemy 模型
+   - ConfigHistory 审计表
+   - EmailTemplate 邮件模板
 
 2. **配置服务核心** (3天)
-   - ConfigService配置管理
+   - ConfigService 配置管理
    - 配置验证器（数据类型、范围、正则）
    - 加密存储实现
 
 3. **配置动态应用** (3天)
-   - @RefreshScope配置刷新
+   - pydantic-settings + Redis 订阅热重载
    - 邮件配置动态更新
    - 安全策略动态应用
 
@@ -135,13 +135,13 @@
    - 邮件模板管理
 
 5. **配置缓存优化** (2天)
-   - 多级缓存策略（Caffeine + Redis）
+   - 多级缓存策略（cachetools + Redis）
    - 配置预加载机制
    - 缓存失效监听
 
 #### 技术挑战
 - 敏感配置加密存储和解密性能
-- 配置动态刷新时的线程安全
+- 配置动态刷新时的并发安全
 - 配置验证的复杂性
 
 #### 交付物
@@ -156,12 +156,12 @@
 
 #### 任务清单
 1. **数据权限模型** (2天)
-   - DataScope枚举定义
+   - DataScope 枚举定义
    - 角色数据范围字段
    - 自定义条件存储设计
 
-2. **权限过滤拦截器** (3天)
-   - DataPermissionInterceptor实现
+2. **权限过滤依赖** (3天)
+   - DataPermissionFilter 实现（FastAPI 依赖/SQLAlchemy where）
    - 部门数据过滤逻辑
    - 自定义条件解析器
 
@@ -197,32 +197,32 @@
 
 #### 任务清单
 1. **登录流程优化** (3天)
-   - Redis Pipeline批量操作
-   - 异步审计日志
-   - JWT生成优化
+   - Redis Pipeline 批量操作（redis-py async）
+   - 异步审计日志（aiokafka）
+   - JWT 生成优化
 
 2. **数据库优化** (3天)
    - 关键索引优化
    - 查询语句优化
-   - 连接池调优
+   - 连接池调优（SQLAlchemy async + asyncpg）
 
 3. **缓存策略优化** (2天)
-   - 多级缓存架构
+   - 多级缓存架构（cachetools + Redis）
    - 缓存预热机制
    - 缓存一致性策略
 
-4. **JVM和GC优化** (2天)
-   - G1GC参数调优
-   - 堆内存配置
-   - 虚拟线程启用
+4. **进程与事件循环优化** (2天)
+   - uvloop 事件循环启用
+   - gunicorn 多 worker 调优（每核 1-2 个）
+   - worker 内存上限与重启策略
 
 5. **压力测试和调优** (2天)
-   - k6压力测试脚本
+   - k6 压力测试脚本
    - 性能监控和 profiling
    - 瓶颈分析和优化
 
 #### 技术挑战
-- 10,000 TPS登录性能达标
+- 10,000 TPS 登录性能达标
 - 高并发下的数据一致性
 - 系统资源利用率优化
 
@@ -274,12 +274,12 @@
 
 #### 任务清单
 1. **生产环境部署** (3天)
-   - Kubernetes部署配置
+   - Kubernetes 部署配置
    - 监控告警配置
    - 日志聚合配置
 
 2. **数据迁移** (2天)
-   - 生产数据迁移脚本
+   - 生产数据迁移脚本（Alembic）
    - 数据验证和回滚计划
    - 历史数据清理
 
@@ -291,7 +291,7 @@
 4. **文档完善** (2天)
    - 用户操作手册
    - 运维手册
-   - API文档
+   - API文档（FastAPI OpenAPI）
 
 5. **上线发布** (1天)
    - 正式上线部署
@@ -310,8 +310,8 @@
 ### 3.1 人力资源
 | 角色 | 数量 | 职责 |
 |------|------|------|
-| 后端开发 | 2人 | Spring Boot开发，数据库设计 |
-| 前端开发 | 1人 | Next.js开发，UI组件 |
+| 后端开发 | 2人 | FastAPI 开发，数据库设计 |
+| 前端开发 | 1人 | Next.js 开发，UI 组件 |
 | 测试工程师 | 1人 | 测试用例，自动化测试 |
 | DevOps | 0.5人 | 部署，监控，CI/CD |
 
@@ -325,7 +325,7 @@
 ### 3.3 软件资源
 | 工具 | 用途 | 版本 |
 |------|------|------|
-| JDK | 后端运行 | 21 |
+| Python | 后端运行 | 3.12 |
 | Node.js | 前端运行 | 20 |
 | PostgreSQL | 数据库 | 15 |
 | Redis | 缓存 | 7 |
@@ -344,6 +344,7 @@
 | 部门树性能问题 | 中 | 中 | Materialized Path优化，缓存策略 |
 | 数据权限实现复杂 | 高 | 中 | 分阶段实现，先核心后增强 |
 | 配置管理过度设计 | 中 | 低 | MVP最小实现，迭代增强 |
+| GIL/事件循环阻塞 | 中 | 中 | 全链路异步，CPU 密集移至进程池 |
 
 ### 4.2 进度风险
 | 风险 | 可能性 | 影响 | 缓解措施 |
@@ -368,9 +369,9 @@
 ### 5.1 测试策略
 | 测试类型 | 工具 | 覆盖率目标 | 执行频率 |
 |----------|------|------------|----------|
-| 单元测试 | JUnit 5 | 85%+ | 每次提交 |
-| 集成测试 | Spring Boot Test | 关键流程 | 每日构建 |
-| API测试 | Postman/Test | 100%接口 | 每日构建 |
+| 单元测试 | pytest + pytest-asyncio | 85%+ | 每次提交 |
+| 集成测试 | pytest + httpx + Testcontainers | 关键流程 | 每日构建 |
+| API测试 | httpx AsyncClient / FastAPI TestClient | 100%接口 | 每日构建 |
 | 性能测试 | k6 | 达标指标 | 每周 |
 | 安全测试 | OWASP ZAP | 无高危漏洞 | 每版本 |
 | E2E测试 | Playwright | 核心流程 | 每日 |
@@ -378,16 +379,16 @@
 ### 5.2 代码质量
 | 检查项 | 工具 | 标准 |
 |--------|------|------|
-| 代码规范 | Checkstyle | 遵循规范 |
-| 静态分析 | SonarQube | 无 blocker |
-| 依赖安全 | OWASP DC | 无高危CVE |
-| 测试覆盖率 | JaCoCo | ≥85% |
+| 代码规范 | ruff + black + isort | 遵循规范 |
+| 静态分析 | SonarQube (Python) / ruff | 无 blocker |
+| 依赖安全 | pip-audit / safety | 无高危CVE |
+| 测试覆盖率 | pytest-cov / coverage.py | ≥85% |
 
 ### 5.3 文档要求
 | 文档类型 | 内容要求 | 完成时间 |
 |----------|----------|----------|
 | 架构设计 | 系统架构，模块设计 | 阶段1 |
-| API文档 | OpenAPI规范 | 阶段2-5 |
+| API文档 | OpenAPI（FastAPI 自动生成） | 阶段2-5 |
 | 用户手册 | 操作指南，FAQ | 阶段6 |
 | 运维手册 | 部署，监控，故障处理 | 阶段7 |
 
@@ -430,13 +431,13 @@
 | 日志平台 | 内部 | 已就绪 | ELK Stack |
 
 ### 7.2 假设条件
-1. 团队具备Spring Boot和Next.js开发经验
+1. 团队具备 FastAPI 和 Next.js 开发经验
 2. 基础设施（服务器、网络）已就绪
 3. 业务需求在实施期间相对稳定
 4. 关键依赖服务可用性有保障
 
 ### 7.3 约束条件
-1. 必须使用已选定的技术栈（Spring Boot, Next.js等）
+1. 必须使用已选定的技术栈（FastAPI, Next.js等）
 2. 必须满足等保2.0三级安全要求
 3. 必须支持容器化部署（Docker + K8s）
 4. 必须保持向后兼容性（API版本控制）
@@ -457,3 +458,4 @@
 | 版本 | 日期 | 修改人 | 修改内容 |
 |------|------|--------|----------|
 | 1.0 | 2026-03-27 | 系统架构师 | 初始版本，完整实施计划 |
+| 1.1 | 2026-07-04 | 系统架构师 | 后端技术栈由 Spring Boot/JDK 21 调整为 FastAPI/Python 3.12（Alembic/SQLAlchemy/pytest/uvloop） |

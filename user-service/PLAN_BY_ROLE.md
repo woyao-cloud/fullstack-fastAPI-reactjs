@@ -25,11 +25,10 @@
 
 | 层级 | 技术 | 版本 |
 |------|------|------|
-| 后端 | Spring Boot | 3.5 + JDK 21 |
-| 后端 | Spring Data JPA | 3.5 |
-| 后端 | Spring Security | 6.x |
+| 后端 | FastAPI + Python 3.12 | 0.115+ |
+| 数据访问 | SQLAlchemy 2.x (async) + asyncpg | 2.x |
 | 数据库 | PostgreSQL | 15 |
-| 迁移工具 | Flyway | 10.x |
+| 迁移工具 | Alembic | 1.x |
 | 前端 | Next.js | 16+ |
 | 前端 | TypeScript | 5+ |
 | 前端 | Tailwind CSS | 3.x |

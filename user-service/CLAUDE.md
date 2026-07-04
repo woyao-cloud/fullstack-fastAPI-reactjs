@@ -8,7 +8,7 @@
 
 ## 项目概述
 
-全栈用户管理系统，采用 Spring Boot 后端和 Next.js 前端，提供用户注册、登录、权限管理、角色分配等功能。
+全栈用户管理系统，采用 FastAPI 后端和 Next.js 前端，提供用户注册、登录、权限管理、角色分配等功能。
 
 
 
@@ -26,7 +26,6 @@
 ### 后端
 - fastAPI
 - PostgreSQL (生产) /(开发测试)
-- Spring Security + JWT + OAuth2 认证
 
 ### 前端
 - Next.js 16+ (App Router)

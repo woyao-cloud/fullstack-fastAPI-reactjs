@@ -16,8 +16,8 @@ usermanagement/
 ├── backend/
 │   ├── Dockerfile                        # 后端生产环境 Dockerfile
 │   ├── Dockerfile.dev                    # 后端开发环境 Dockerfile
-│   └── src/main/resources/
-│       └── application-team.yml          # Team 环境 Spring Boot 配置
+│   └── app/
+│       └── config.py                     # Team 环境 FastAPI 配置（pydantic-settings）
 │
 ├── frontend/
 │   ├── Dockerfile                        # 前端生产环境 Dockerfile
@@ -66,8 +66,8 @@ usermanagement/
 
 | 文件 | 用途 | 说明 |
 |------|------|------|
-| `backend/Dockerfile` | 后端生产 | 多阶段构建、JVM 优化、健康检查 |
-| `backend/Dockerfile.dev` | 后端开发 | 热重载、远程调试 (5005) |
+| `backend/Dockerfile` | 后端生产 | 多阶段构建、uvicorn/gunicorn worker、健康检查 |
+| `backend/Dockerfile.dev` | 后端开发 | 热重载、远程调试 |
 | `frontend/Dockerfile` | 前端生产 | Next.js standalone、多阶段构建 |
 | `frontend/Dockerfile.dev` | 前端开发 | Node 开发模式、热重载 |
 
@@ -75,7 +75,7 @@ usermanagement/
 
 | 文件 | 用途 | 说明 |
 |------|------|------|
-| `application-team.yml` | Spring Boot | Team 环境配置 |
+| `config.py` | FastAPI | Team 环境配置（pydantic-settings + .env） |
 | `redis.conf` | Redis | 性能优化配置 |
 | `nginx.team.conf` | Nginx | 反向代理配置 |
 | `prometheus.yml` | Prometheus | 监控指标配置 |

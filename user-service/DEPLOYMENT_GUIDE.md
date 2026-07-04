@@ -38,7 +38,7 @@ docker-compose exec postgres pg_isready -U devuser -d user_management
 
 # 3. 初始化数据库（先建表，后插入测试数据）
 # 此步骤会自动执行:
-#   - backend/src/main/resources/db/migration/V*.sql (建表脚本)
+#   - backend/alembic/versions/*.py (建表迁移)
 #   - scripts/test-data/01-*.sql ~ 06-*.sql (测试数据)
 docker-compose --profile seed run --rm db-seed
 
@@ -139,7 +139,7 @@ docker-compose -f docker-compose.team.yml ps
 |------|------|------|
 | PostgreSQL | 5432 | 团队共享数据库 |
 | Redis | 6379 | 团队共享缓存 |
-| Backend | 8080 | Spring Boot 应用 |
+| Backend | 8080 |  应用 |
 | Frontend | 3000 | Next.js 应用 |
 
 ### 3. SIT/UAT/生产环境 (Kubernetes)
@@ -150,13 +150,13 @@ docker-compose -f docker-compose.team.yml ps
 
 ## 数据库与数据管理
 
-### Flyway迁移脚本位置
+### Alembic迁移脚本位置
 ```
-backend/src/main/resources/db/
-├── migration/              # 表结构迁移（所有环境）
-│   ├── V1__Initial_schema.sql
-│   ├── V2__Add_roles_permissions.sql
-│   └── V3__Add_audit_tables.sql
+backend/alembic/
+├── versions/               # 表结构迁移（所有环境，Python 脚本）
+│   ├── 0001_initial_schema.py
+│   ├── 0002_add_roles_permissions.py
+│   └── 0003_add_audit_tables.py
 ├── data/
 │   ├── local/              # 本地开发数据种子
 │   ├── team/               # Team开发数据种子
@@ -192,7 +192,7 @@ backend/src/main/resources/db/
 ```bash
 # 本地开发环境
 # 会自动执行:
-#   1. backend/src/main/resources/db/migration/V*.sql (建表)
+#   1. backend/alembic/versions/*.py (建表迁移)
 #   2. scripts/test-data/*.sql (测试数据)
 docker-compose --profile seed run --rm db-seed
 
@@ -208,9 +208,9 @@ docker-compose -f docker-compose.team.yml --profile seed run --rm db-seed
 如果手动执行，请严格按照以下顺序：
 
 ```bash
-# 1. 先执行建表脚本（Flyway 迁移）
-psql -h localhost -U devuser -d user_management -f backend/src/main/resources/db/migration/V1__Initial_schema.sql
-psql -h localhost -U devuser -d user_management -f backend/src/main/resources/db/migration/V2__add_oauth2_support.sql
+# 1. 先执行建表迁移（Alembic）
+cd backend
+alembic upgrade head
 
 # 2. 再执行测试数据脚本
 psql -h localhost -U devuser -d user_management -f scripts/test-data/01-departments.sql
@@ -258,33 +258,7 @@ docker-compose -f docker-compose.dev.yml up -d
 ### Team 开发环境 Dockerfile
 
 **Backend Dockerfile** (`backend/Dockerfile`):
-```dockerfile
-# 多阶段构建
-FROM eclipse-temurin:21-jdk-alpine AS builder
-RUN apk add --no-cache maven
-WORKDIR /build
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests -B -q
 
-FROM eclipse-temurin:21-jre-alpine AS production
-RUN apk add --no-cache curl ca-certificates tzdata
-ENV TZ=Asia/Shanghai
-RUN addgroup -g 1000 appgroup && adduser -u 1000 -G appgroup -s /bin/sh -D appuser
-WORKDIR /app
-COPY --from=builder /build/target/dependency/BOOT-INF/lib /app/lib
-COPY --from=builder /build/target/dependency/META-INF /app/META-INF
-COPY --from=builder /build/target/dependency/BOOT-INF/classes /app
-RUN chown -R appuser:appgroup /app
-USER appuser
-EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD curl -f http://localhost:8080/actuator/health || exit 1
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0",
-    "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200",
-    "-Djava.security.egd=file:/dev/./urandom",
-    "-cp", "app:app/lib/*", "com.usermanagement.Application"]
-```
 
 **Frontend Dockerfile** (`frontend/Dockerfile`):
 ```dockerfile
@@ -325,33 +299,26 @@ CMD ["node", "server.js"]
 
 #### 内存配置建议
 
-| 容器内存限制 | JVM 堆内存 (-Xmx) | 推荐场景 |
-|--------------|-------------------|----------|
-| 512MB | 384MB | 开发/测试 |
-| 1GB | 768MB | 小型生产 |
-| 2GB | 1536MB | 中型生产 |
-| 4GB | 3072MB | 大型生产 |
+| 容器内存限制 | gunicorn worker 数 (--workers) | 推荐场景 |
+|--------------|------------------------------|----------|
+| 512MB | 1 | 开发/测试 |
+| 1GB | 2 | 小型生产 |
+| 2GB | 4 | 中型生产 |
+| 4GB | 8 | 大型生产 |
 
 ## CI/CD 流程
 
-### Spring Boot 后端构建流程
+### 后端构建流程
 
 1. **代码提交触发构建**
    ```bash
    git push origin feature/xxx
    ```
 
-2. **Maven 构建和测试**
-   ```bash
-   ./mvnw clean verify
-   # 包含: 编译、测试、覆盖率检查、包构建
-   ```
+
 
 3. **代码质量检查**
-   ```bash
-   ./mvnw checkstyle:check
-   ./mvnw spotbugs:check
-   ```
+
 
 4. **构建 Docker 镜像**
    ```bash
@@ -367,7 +334,7 @@ CMD ["node", "server.js"]
 
 6. **运行冒烟测试**
    ```bash
-   curl http://backend:8080/actuator/health
+   curl http://backend:8000/health
    ```
 
 ### GitHub Actions 工作流示例
@@ -385,15 +352,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
+          python-version: '3.12'
 
-      - name: Build with Maven
-        run: ./mvnw clean verify
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint and test
+        run: uv run ruff check . && uv run pytest --cov
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -404,26 +375,17 @@ jobs:
 
 ## 监控告警
 
-### Spring Boot 监控
-- **Spring Boot Actuator**: 健康检查、指标、信息端点
-  - `/actuator/health` - 健康状态
-  - `/actuator/metrics` - JVM、HTTP、数据库指标
-  - `/actuator/prometheus` - Prometheus 格式指标
-- **Micrometer + Prometheus**: 应用指标收集
-- **Grafana**: 可视化仪表板
-- **日志聚合**: ELK Stack (Elasticsearch + Logstash + Kibana)
-- **错误追踪**: Sentry / Sentry-Spring
+
 
 ### 关键监控指标
 
 | 指标 | 告警阈值 | 说明 |
 |------|----------|------|
-| JVM 内存使用 | > 80% | 堆内存使用率 |
 | HTTP 响应时间 | P95 > 500ms | API 响应延迟 |
 | 错误率 | > 1% | HTTP 5xx 错误比例 |
-| 活跃线程数 | > 200 | 虚拟线程池监控 |
-| 数据库连接池 | > 80% | HikariCP 连接使用率 |
-| GC 暂停时间 | > 1s | 垃圾回收停顿 |
+| 事件循环延迟 | > 100ms | asyncio 事件循环阻塞监控 |
+| 数据库连接池 | > 80% | SQLAlchemy 连接使用率 |
+
 
 ## 常用命令
 
@@ -507,27 +469,26 @@ docker-compose exec backend ping postgres
 - 检查数据库用户名密码是否正确
 - 检查数据库是否已创建
 
-#### 2. Flyway 迁移失败
+#### 2. Alembic 迁移失败
 
-**症状**: 应用启动时报 Flyway 错误
+**症状**: 应用启动时报 Alembic 错误
 
 **排查**:
 ```bash
 # 查看迁移状态
-docker-compose exec backend ./mvnw flyway:info -Dspring.profiles.active=dev
-
-# 查看具体错误
+docker-compose exec backend alembic current
 docker-compose logs backend
 ```
 
 **解决**:
 ```bash
-# 修复迁移（谨慎操作，仅开发环境）
-docker-compose exec backend ./mvnw flyway:repair -Dspring.profiles.active=dev
+# 回退一个版本后重新升级（谨慎操作，仅开发环境）
+docker-compose exec backend alembic downgrade -1
+docker-compose exec backend alembic upgrade head
 
 # 或者清理数据库后重新迁移
 docker-compose exec postgres psql -U devuser -d user_management -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-docker-compose restart backend
+docker-compose exec backend alembic upgrade head
 ```
 
 #### 3. 测试数据初始化失败
@@ -548,7 +509,7 @@ psql -h localhost -U devuser -d user_management -a -f scripts/test-data/01-depar
 
 **解决**:
 - 确保按顺序执行脚本（01 -> 06）
-- 检查 Flyway 迁移是否已完成
+- 检查 Alembic 迁移是否已完成
 - 检查是否有外键约束错误（父表数据是否已插入）
 
 #### 4. 端口被占用
