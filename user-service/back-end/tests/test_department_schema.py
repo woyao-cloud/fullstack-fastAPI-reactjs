@@ -4,10 +4,12 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from pydantic import ValidationError
 
 from app.application.schemas.department import (
-    DepartmentCreate, DepartmentMove, DepartmentTreeNode, DepartmentUpdate,
+    DepartmentCreate,
+    DepartmentMove,
+    DepartmentTreeNode,
+    DepartmentUpdate,
 )
 
 pytestmark = pytest.mark.asyncio

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +14,7 @@ from app.application.schemas.department import (
     DepartmentUpdate,
 )
 from app.application.schemas.user import UserOut
-from app.core.cache import DepartmentCache, NoopDepartmentCache
+from app.core.cache import DepartmentCache
 from app.core.exceptions import BusinessException, ConflictError, NotFoundError
 from app.domain.models.department import Department
 from app.domain.models.user import User
@@ -83,10 +84,10 @@ class DepartmentService:
             raise ConflictError("存在子部门,无法删除")
         if await self.repo.count_users(dept_id) > 0:
             raise ConflictError("存在关联用户,无法删除")
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         dept.status = "INACTIVE"
-        dept.deleted_at = datetime.now(timezone.utc)
+        dept.deleted_at = datetime.now(UTC)
         await self.db.flush()
         await self.db.commit()
         await self.cache.invalidate()

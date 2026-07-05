@@ -10,7 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
 from app.domain.models import Base
 from app.domain.models.enums import UserStatus
-
 from app.domain.models.role import Role
 
 if TYPE_CHECKING:
@@ -45,7 +44,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_login_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
-    roles: Mapped[list["Role"]] = relationship(
+    roles: Mapped[list[Role]] = relationship(
         secondary="user_role", back_populates="users", lazy="selectin"
     )
 

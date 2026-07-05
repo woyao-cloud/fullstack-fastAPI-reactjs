@@ -10,9 +10,9 @@ from app.application.schemas.department import DepartmentCreate, DepartmentUpdat
 from app.application.services.department_service import DepartmentService
 from app.core.cache import NoopDepartmentCache
 from app.core.exceptions import BusinessException, ConflictError, NotFoundError
+from app.core.security import hash_password
 from app.domain.models.department import Department
 from app.domain.models.user import User
-from app.core.security import hash_password
 from app.repositories.department_repository import DepartmentRepository
 
 pytestmark = pytest.mark.asyncio
@@ -55,7 +55,9 @@ async def test_create_parent_at_level5(engine, seed):
         # 构造 5 级链
         prev = await svc.create(DepartmentCreate(name="L1", code="C1"))
         for i in range(4):
-            prev = await svc.create(DepartmentCreate(name=f"L{i+2}", code=f"C{i+2}", parent_id=prev.id))
+            prev = await svc.create(
+                DepartmentCreate(name=f"L{i+2}", code=f"C{i+2}", parent_id=prev.id)
+            )
         assert prev.level == 5
         with pytest.raises(BusinessException):
             await svc.create(DepartmentCreate(name="L6", code="C6", parent_id=prev.id))
@@ -156,15 +158,16 @@ async def test_move_exceeds_5levels_rejected(engine, seed):
         prev = await svc.create(DepartmentCreate(name="L1", code="C1"))
         chain_root = prev
         for i in range(4):
-            prev = await svc.create(DepartmentCreate(name=f"L{i+2}", code=f"C{i+2}", parent_id=prev.id))
-        # chain_root.level==1,后代最深 L5;把 chain_root 子树挂到 root2 下 → root2.level1, chain_root 变 2,后代变 6 → 超限
+            prev = await svc.create(
+                DepartmentCreate(name=f"L{i+2}", code=f"C{i+2}", parent_id=prev.id)
+            )
+        # chain_root.level==1,后代最深 L5;把 chain_root 子树挂到 root2 下
+        # → root2.level1, chain_root 变 2,后代变 6 → 超限
         root2 = await svc.create(DepartmentCreate(name="R2", code="R2"))
         with pytest.raises(BusinessException):
             await svc.move(chain_root.id, root2.id)
 
 
-from app.application.schemas.department import DepartmentTreeNode
-from app.application.schemas.user import UserOut
 
 
 async def test_get_tree_nested(engine, seed):
@@ -172,7 +175,7 @@ async def test_get_tree_nested(engine, seed):
     async with Session() as db:
         svc = _service(db)
         root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
-        rd = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
         tree = await svc.get_tree()
         assert len(tree) == 1 and tree[0].code == "HQ"
         assert [c.code for c in tree[0].children] == ["RD"]
@@ -183,8 +186,8 @@ async def test_get_subtree(engine, seed):
     async with Session() as db:
         svc = _service(db)
         root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
-        rd = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
-        other = await svc.create(DepartmentCreate(name="销售", code="SL"))
+        await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        await svc.create(DepartmentCreate(name="销售", code="SL"))
         sub = await svc.get_subtree(root.id)
         assert len(sub) == 1 and sub[0].code == "HQ"
         assert [c.code for c in sub[0].children] == ["RD"]
@@ -195,7 +198,7 @@ async def test_get_tree_excludes_inactive(engine, seed):
     async with Session() as db:
         svc = _service(db)
         a = await svc.create(DepartmentCreate(name="A", code="A"))
-        b = await svc.create(DepartmentCreate(name="B", code="B"))
+        await svc.create(DepartmentCreate(name="B", code="B"))
         await svc.delete(a.id)
         tree = await svc.get_tree()
         assert [n.code for n in tree] == ["B"]

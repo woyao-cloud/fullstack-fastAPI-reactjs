@@ -4,11 +4,11 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import inspect
 
-from app.domain.models import Base
 import app.domain.models.associations  # noqa: F401
+import app.domain.models.department  # noqa: F401
 import app.domain.models.role  # noqa: F401
 import app.domain.models.user  # noqa: F401
-import app.domain.models.department  # noqa: F401
+from app.domain.models import Base
 
 pytestmark = pytest.mark.asyncio
 

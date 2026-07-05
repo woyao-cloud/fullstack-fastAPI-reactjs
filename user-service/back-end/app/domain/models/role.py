@@ -28,7 +28,7 @@ class Permission(Base):
     resource: Mapped[str] = mapped_column(String(50), nullable=False)
     action: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    roles: Mapped[list["Role"]] = relationship(
+    roles: Mapped[list[Role]] = relationship(
         secondary="role_permission", back_populates="permissions", lazy="selectin"
     )
 
@@ -45,10 +45,10 @@ class Role(Base):
     )
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE", nullable=False)
 
-    users: Mapped[list["User"]] = relationship(
+    users: Mapped[list[User]] = relationship(
         secondary="user_role", back_populates="roles", lazy="selectin"
     )
-    permissions: Mapped[list["Permission"]] = relationship(
+    permissions: Mapped[list[Permission]] = relationship(
         secondary="role_permission", back_populates="roles", lazy="selectin"
     )
 

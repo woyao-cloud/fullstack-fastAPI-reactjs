@@ -60,7 +60,7 @@ class DepartmentTreeNode(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
-    children: list["DepartmentTreeNode"] = Field(default_factory=list)
+    children: list[DepartmentTreeNode] = Field(default_factory=list)
 
 
 DepartmentTreeNode.model_rebuild()

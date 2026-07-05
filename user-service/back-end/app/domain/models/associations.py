@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 from sqlalchemy import Column, ForeignKey, Table, Uuid
 
 from app.domain.models import Base

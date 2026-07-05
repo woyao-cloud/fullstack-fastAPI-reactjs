@@ -88,8 +88,7 @@ async def create_department(
     cache: DepartmentCache = Depends(get_department_cache),
     _: User = Depends(require_permission("dept:create")),
 ) -> DepartmentOut:
-    dept = await _svc(db, cache).create(req)
-    return DepartmentOut.model_validate(dept)
+    return DepartmentOut.model_validate(await _svc(db, cache).create(req))
 
 
 @router.put("/{dept_id}", response_model=DepartmentOut)
@@ -131,5 +130,4 @@ async def list_dept_users(
     cache: DepartmentCache = Depends(get_department_cache),
     _: User = Depends(require_permission("dept:read")),
 ):
-    from app.application.schemas.user import UserOut
     return await _svc(db, cache).list_users(dept_id)

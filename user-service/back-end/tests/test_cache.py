@@ -29,7 +29,6 @@ async def test_factory_returns_noop_when_disabled(monkeypatch):
 
 
 # tests/test_cache.py —— 末尾追加
-import json
 
 
 class FakeRedis:

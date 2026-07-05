@@ -49,3 +49,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI 依赖 `Depends(...)` / `Query(...)` 作为参数默认值,是该框架的惯用写法,
+# 重构会改变路由签名且无收益,故全局忽略。
+ignore = ["B008"]

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Uuid, func, select
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Uuid, select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.models import Base

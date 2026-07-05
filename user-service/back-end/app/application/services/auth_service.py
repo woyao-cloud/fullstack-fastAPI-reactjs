@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,7 +59,7 @@ class AuthService:
             raise AuthError("邮箱或密码错误")
         if not verify_password(req.password, user.password_hash):
             raise AuthError("邮箱或密码错误")
-        user.last_login_at = datetime.now(timezone.utc).isoformat()
+        user.last_login_at = datetime.now(UTC).isoformat()
         await self.db.commit()
         return TokenResponse(
             access_token=create_access_token(user.id),
