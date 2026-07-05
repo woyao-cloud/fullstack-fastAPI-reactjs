@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.schemas.department import DepartmentCreate, DepartmentUpdate
+from app.application.schemas.department import (
+    DepartmentCreate,
+    DepartmentTreeNode,
+    DepartmentUpdate,
+)
+from app.application.schemas.user import UserOut
 from app.core.cache import DepartmentCache, NoopDepartmentCache
 from app.core.exceptions import BusinessException, ConflictError, NotFoundError
 from app.domain.models.department import Department
+from app.domain.models.user import User
 from app.repositories.department_repository import DepartmentRepository
 
 MAX_LEVEL = 5
@@ -127,4 +134,56 @@ class DepartmentService:
         await self.cache.invalidate()
         return dept
 
-    # get_tree / get_subtree / list_users 见 Task 8
+    @staticmethod
+    def _build_tree(flat: list[Department]) -> list[DepartmentTreeNode]:
+        nodes: dict[uuid.UUID, DepartmentTreeNode] = {}
+        for d in flat:
+            nodes[d.id] = DepartmentTreeNode(
+                id=d.id, node_seq=d.node_seq, name=d.name, code=d.code,
+                parent_id=d.parent_id, level=d.level, path=d.path,
+                sort_order=d.sort_order, manager_id=d.manager_id, status=d.status,
+                created_at=d.created_at, updated_at=d.updated_at, children=[],
+            )
+        roots: list[DepartmentTreeNode] = []
+        for d in flat:
+            node = nodes[d.id]
+            if d.parent_id is not None and d.parent_id in nodes:
+                nodes[d.parent_id].children.append(node)
+            else:
+                roots.append(node)
+        return roots
+
+    async def get_tree(self) -> list[DepartmentTreeNode]:
+        cached = await self.cache.get_tree()
+        if cached is not None:
+            return [DepartmentTreeNode.model_validate(n) for n in cached]
+        flat = await self.repo.list_active()
+        tree = self._build_tree(flat)
+        await self.cache.set_tree([n.model_dump() for n in tree])
+        return tree
+
+    async def get_subtree(self, root_id: uuid.UUID) -> list[DepartmentTreeNode]:
+        root = await self._get_or_404(root_id)
+        flat = await self.repo.find_subtree(root.path)
+        # 以 root 为根组装
+        nodes: dict[uuid.UUID, DepartmentTreeNode] = {}
+        for d in flat:
+            nodes[d.id] = DepartmentTreeNode(
+                id=d.id, node_seq=d.node_seq, name=d.name, code=d.code,
+                parent_id=d.parent_id, level=d.level, path=d.path,
+                sort_order=d.sort_order, manager_id=d.manager_id, status=d.status,
+                created_at=d.created_at, updated_at=d.updated_at, children=[],
+            )
+        roots: list[DepartmentTreeNode] = []
+        for d in flat:
+            node = nodes[d.id]
+            if d.id == root.id:
+                roots.append(node)
+            elif d.parent_id is not None and d.parent_id in nodes:
+                nodes[d.parent_id].children.append(node)
+        return roots
+
+    async def list_users(self, dept_id: uuid.UUID) -> list[UserOut]:
+        await self._get_or_404(dept_id)
+        result = await self.db.execute(select(User).where(User.department_id == dept_id))
+        return [UserOut.model_validate(u) for u in result.scalars().all()]

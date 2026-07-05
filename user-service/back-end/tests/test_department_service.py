@@ -161,3 +161,55 @@ async def test_move_exceeds_5levels_rejected(engine, seed):
         root2 = await svc.create(DepartmentCreate(name="R2", code="R2"))
         with pytest.raises(BusinessException):
             await svc.move(chain_root.id, root2.id)
+
+
+from app.application.schemas.department import DepartmentTreeNode
+from app.application.schemas.user import UserOut
+
+
+async def test_get_tree_nested(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        rd = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        tree = await svc.get_tree()
+        assert len(tree) == 1 and tree[0].code == "HQ"
+        assert [c.code for c in tree[0].children] == ["RD"]
+
+
+async def test_get_subtree(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        rd = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        other = await svc.create(DepartmentCreate(name="销售", code="SL"))
+        sub = await svc.get_subtree(root.id)
+        assert len(sub) == 1 and sub[0].code == "HQ"
+        assert [c.code for c in sub[0].children] == ["RD"]
+
+
+async def test_get_tree_excludes_inactive(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        a = await svc.create(DepartmentCreate(name="A", code="A"))
+        b = await svc.create(DepartmentCreate(name="B", code="B"))
+        await svc.delete(a.id)
+        tree = await svc.get_tree()
+        assert [n.code for n in tree] == ["B"]
+
+
+async def test_list_users(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        db.add(User(email="u1@t.com", password_hash=hash_password("X@1234567"),
+                    first_name="U", last_name="L", department_id=root.id))
+        db.add(User(email="u2@t.com", password_hash=hash_password("X@1234567"),
+                    first_name="U2", last_name="L", department_id=root.id))
+        await db.commit()
+        users = await svc.list_users(root.id)
+        assert {u.email for u in users} == {"u1@t.com", "u2@t.com"}
