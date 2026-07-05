@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.core.database import engine
 from app.core.exceptions import register_exception_handlers
 from app.domain.models import Base
-from app.interfaces.api import auth, health, users
+from app.interfaces.api import auth, departments, health, users
 
 
 @asynccontextmanager
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
     app.include_router(users.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(departments.router, prefix=settings.API_V1_PREFIX)
 
     return app
 

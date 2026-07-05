@@ -75,6 +75,10 @@ async def seed(db_session):
         Permission(name="用户更新", code="user:update", type="ACTION", resource="user", action="update"),
         Permission(name="用户删除", code="user:delete", type="ACTION", resource="user", action="delete"),
         Permission(name="用户分配角色", code="user:assign_role", type="ACTION", resource="user", action="assign_role"),
+        Permission(name="部门读取", code="dept:read", type="ACTION", resource="dept", action="read"),
+        Permission(name="部门创建", code="dept:create", type="ACTION", resource="dept", action="create"),
+        Permission(name="部门更新", code="dept:update", type="ACTION", resource="dept", action="update"),
+        Permission(name="部门删除", code="dept:delete", type="ACTION", resource="dept", action="delete"),
     ]
     db_session.add_all(perms)
     await db_session.flush()
@@ -96,6 +100,8 @@ async def client(engine, seed) -> AsyncIterator[AsyncClient]:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
+    from app.core.cache import NoopDepartmentCache, get_department_cache
+    app.dependency_overrides[get_department_cache] = lambda: NoopDepartmentCache()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
