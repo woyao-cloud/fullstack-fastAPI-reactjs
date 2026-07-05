@@ -84,4 +84,47 @@ class DepartmentService:
         await self.db.commit()
         await self.cache.invalidate()
 
-    # move / get_tree / get_subtree / list_users 见 Task 7、Task 8
+    async def move(self, dept_id: uuid.UUID, new_parent_id: uuid.UUID | None) -> Department:
+        dept = await self._get_or_404(dept_id)
+        old_path = dept.path
+        old_level = dept.level
+
+        if new_parent_id is None:
+            new_parent = None
+            new_level = 1
+            new_prefix = f"/{dept.node_seq}"
+        else:
+            if new_parent_id == dept_id:
+                raise BusinessException("不能将部门移动到自身之下")
+            new_parent = await self.repo.get_by_id(new_parent_id)
+            if new_parent is None:
+                raise NotFoundError("父部门不存在")
+            # 防循环:新父不能是自身或自身后代
+            if new_parent.path == old_path or new_parent.path.startswith(old_path + "/"):
+                raise BusinessException("不能形成循环依赖")
+            new_level = new_parent.level + 1
+            new_prefix = f"{new_parent.path}/{dept.node_seq}"
+
+        # 深度校验:移动后子树最大深度不超过 5
+        max_depth = await self.repo.max_descendant_depth(old_path, old_level)
+        if new_level + max_depth > MAX_LEVEL:
+            raise BusinessException("移动后层级超过 5 级限制")
+
+        level_delta = new_level - old_level
+        # 注: brief 使用 `async with self.db.begin()`,但预检读取已触发 autobegin,
+        # 再次 begin 会抛 InvalidRequestError。改为 flush+commit(与本仓 user_service 一致)。
+        dept.parent_id = new_parent_id
+        dept.level = new_level
+        dept.path = new_prefix
+        await self.db.flush()
+        # 批量更新后代(排除自身,自身已更新)
+        await self.repo.replace_subtree_paths(
+            old_prefix=old_path, new_prefix=new_prefix,
+            level_delta=level_delta, root_path=old_path + "/",
+        )
+        await self.db.commit()
+        await self.db.refresh(dept)
+        await self.cache.invalidate()
+        return dept
+
+    # get_tree / get_subtree / list_users 见 Task 8

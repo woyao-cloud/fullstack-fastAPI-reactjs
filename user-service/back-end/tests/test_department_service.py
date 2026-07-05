@@ -110,3 +110,54 @@ async def test_update_not_found(engine, seed):
         svc = _service(db)
         with pytest.raises(NotFoundError):
             await svc.update(uuid.uuid4(), DepartmentUpdate(name="x"))
+
+
+async def test_move_subtree_updates_paths(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        rd = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        be = await svc.create(DepartmentCreate(name="后端", code="BE", parent_id=rd.id))
+        other = await svc.create(DepartmentCreate(name="销售", code="SL"))
+        moved = await svc.move(rd.id, other.id)
+        assert moved.parent_id == other.id
+        assert moved.path == f"/{other.node_seq}/{rd.node_seq}" and moved.level == 2
+        # 后代路径/层级跟随
+        be_db = await db.get(Department, be.id)
+        assert be_db.path == f"/{other.node_seq}/{rd.node_seq}/{be.node_seq}" and be_db.level == 3
+
+
+async def test_move_to_root(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        rd = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        moved = await svc.move(rd.id, None)
+        assert moved.parent_id is None and moved.level == 1 and moved.path == f"/{rd.node_seq}"
+
+
+async def test_move_circular_rejected(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        rd = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        # 把 root 移到 rd 之下 → 循环
+        with pytest.raises(BusinessException):
+            await svc.move(root.id, rd.id)
+
+
+async def test_move_exceeds_5levels_rejected(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        prev = await svc.create(DepartmentCreate(name="L1", code="C1"))
+        chain_root = prev
+        for i in range(4):
+            prev = await svc.create(DepartmentCreate(name=f"L{i+2}", code=f"C{i+2}", parent_id=prev.id))
+        # chain_root.level==1,后代最深 L5;把 chain_root 子树挂到 root2 下 → root2.level1, chain_root 变 2,后代变 6 → 超限
+        root2 = await svc.create(DepartmentCreate(name="R2", code="R2"))
+        with pytest.raises(BusinessException):
+            await svc.move(chain_root.id, root2.id)
