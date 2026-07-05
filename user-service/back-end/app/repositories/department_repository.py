@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.department import Department
@@ -43,7 +43,12 @@ class DepartmentRepository:
 
     async def count_children(self, parent_id: uuid.UUID) -> int:
         result = await self.db.execute(
-            select(func.count()).select_from(Department).where(Department.parent_id == parent_id)
+            select(func.count())
+            .select_from(Department)
+            .where(
+                Department.parent_id == parent_id,
+                Department.status == "ACTIVE",
+            )
         )
         return int(result.scalar_one())
 
@@ -71,9 +76,20 @@ class DepartmentRepository:
     async def replace_subtree_paths(
         self, old_prefix: str, new_prefix: str, level_delta: int, root_path: str
     ) -> None:
-        """批量替换子树(含 root_path 匹配项)的 path 前缀并调整 level(严格前缀替换)."""
+        """批量替换子树的 path 前缀并调整 level(严格前缀替换).
+
+        匹配规则: path 等于 root_path 或以 ``root_path + "/"`` 开头。
+        - 传 ``root_path="/1"`` 同时匹配根 ``/1`` 自身及其后代;
+        - 传 ``root_path="/1/"`` 仅匹配后代(排除根自身)。
+        严格前缀匹配,避免 ``/1`` 误伤 ``/10`` 等同级兄弟。
+        """
         result = await self.db.execute(
-            select(Department).where(Department.path.like(f"{root_path}%"))
+            select(Department).where(
+                or_(
+                    Department.path == root_path,
+                    Department.path.like(root_path.rstrip("/") + "/%"),
+                )
+            )
         )
         for dept in result.scalars().all():
             dept.path = new_prefix + dept.path[len(old_prefix):]

@@ -43,6 +43,8 @@ class DepartmentService:
             parent = await self.repo.get_by_id(req.parent_id)
             if parent is None:
                 raise NotFoundError("父部门不存在")
+            if parent.status != "ACTIVE":
+                raise BusinessException("父部门已停用,无法在其下创建子部门")
             if parent.level >= MAX_LEVEL:
                 raise BusinessException(f"父部门已达第 {MAX_LEVEL} 级,无法添加子部门")
             level = parent.level + 1
@@ -188,3 +190,16 @@ class DepartmentService:
         await self._get_or_404(dept_id)
         result = await self.db.execute(select(User).where(User.department_id == dept_id))
         return [UserOut.model_validate(u) for u in result.scalars().all()]
+
+    async def list(self, page: int = 1, size: int = 20) -> tuple[list[Department], int]:
+        flat = await self.repo.list_active()
+        total = len(flat)
+        start = (page - 1) * size
+        items = flat[start:start + size]
+        return items, total
+
+    async def get(self, dept_id: uuid.UUID) -> Department:
+        dept = await self.repo.get_by_id(dept_id)
+        if dept is None:
+            raise NotFoundError("部门不存在")
+        return dept

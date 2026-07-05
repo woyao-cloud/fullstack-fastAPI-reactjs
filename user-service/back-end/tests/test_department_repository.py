@@ -73,6 +73,19 @@ async def test_count_children_and_users(engine, seed):
         assert await repo.count_users(d1.id) == 1
 
 
+async def test_count_children_ignores_soft_deleted(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        repo = DepartmentRepository(db)
+        d1 = await _seed_dept(db, node_seq=1, name="总部", code="HQ", level=1, path="/1")
+        child = await _seed_dept(db, node_seq=2, name="研发", code="RD", level=2,
+                                path="/1/2", parent_id=d1.id)
+        child.status = "INACTIVE"  # 软删除子部门
+        await db.commit()
+        # 软删除的子部门不计入 count_children,允许父部门删除
+        assert await repo.count_children(d1.id) == 0
+
+
 async def test_max_descendant_depth(engine, seed):
     Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     async with Session() as db:
@@ -113,6 +126,8 @@ async def test_replace_subtree_paths_multidigit(engine, seed):
                                path="/1/10", parent_id=d1.id)
         d100 = await _seed_dept(db, node_seq=100, name="后端", code="BE", level=3,
                                 path="/1/10/100", parent_id=d10.id)
+        # 根级 /11 兄弟,不在 /1 子树下,必须不被误伤(LIKE '/1%' 会误匹配 /11)
+        sibling = await _seed_dept(db, node_seq=11, name="兄弟", code="SIB", level=1, path="/11")
         await db.commit()
         await repo.replace_subtree_paths(old_prefix="/1", new_prefix="/9",
                                          level_delta=1, root_path="/1")
@@ -120,6 +135,9 @@ async def test_replace_subtree_paths_multidigit(engine, seed):
         await db.refresh(d1)
         await db.refresh(d10)
         await db.refresh(d100)
+        await db.refresh(sibling)
         assert d1.path == "/9" and d1.level == 2
         assert d10.path == "/9/10" and d10.level == 3   # 不被误改为 /9/90
         assert d100.path == "/9/10/100" and d100.level == 4  # 不被误改为 /9/90/900
+        # 根级 /11 兄弟未被触碰
+        assert sibling.path == "/11" and sibling.level == 1

@@ -94,6 +94,33 @@ async def test_delete_with_children_rejected(engine, seed):
             await svc.delete(root.id)
 
 
+async def test_delete_with_only_inactive_child_ok(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        child = await svc.create(DepartmentCreate(name="研发", code="RD", parent_id=root.id))
+        # 软删除子部门,父部门仅剩一个 INACTIVE 子部门
+        child.status = "INACTIVE"
+        await db.commit()
+        # 父部门应可被删除(不抛 409)
+        await svc.delete(root.id)
+        got = await db.get(Department, root.id)
+        assert got.status == "INACTIVE"
+
+
+async def test_create_under_inactive_parent_rejected(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        svc = _service(db)
+        root = await svc.create(DepartmentCreate(name="总部", code="HQ"))
+        # 软删除父部门
+        root.status = "INACTIVE"
+        await db.commit()
+        with pytest.raises(BusinessException):
+            await svc.create(DepartmentCreate(name="子", code="C", parent_id=root.id))
+
+
 async def test_delete_with_users_rejected(engine, seed):
     Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     async with Session() as db:

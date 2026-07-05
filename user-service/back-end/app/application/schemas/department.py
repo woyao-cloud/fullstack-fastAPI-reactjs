@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,7 +22,7 @@ class DepartmentUpdate(BaseModel):
     code: str | None = Field(default=None, min_length=1, max_length=50)
     sort_order: int | None = None
     manager_id: uuid.UUID | None = None
-    status: str | None = Field(default=None, max_length=20)
+    status: Literal["ACTIVE", "INACTIVE"] | None = None
 
 
 class DepartmentMove(BaseModel):

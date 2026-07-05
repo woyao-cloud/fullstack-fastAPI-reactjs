@@ -16,6 +16,7 @@ from app.application.schemas.department import (
     DepartmentTreeNode,
     DepartmentUpdate,
 )
+from app.application.schemas.user import UserOut
 from app.application.services.department_service import DepartmentService
 from app.core.cache import DepartmentCache, get_department_cache
 from app.core.security import require_permission
@@ -57,12 +58,10 @@ async def list_departments(
     _: User = Depends(require_permission("dept:read")),
 ) -> DepartmentListOut:
     svc = _svc(db, cache)
-    flat = await svc.repo.list_active()
-    start = (page - 1) * size
-    items = flat[start:start + size]
+    items, total = await svc.list(page, size)
     return DepartmentListOut(
         items=[DepartmentOut.model_validate(d) for d in items],
-        total=len(flat), page=page, size=size,
+        total=total, page=page, size=size,
     )
 
 
@@ -74,10 +73,7 @@ async def get_department(
     _: User = Depends(require_permission("dept:read")),
 ) -> DepartmentOut:
     svc = _svc(db, cache)
-    dept = await svc.repo.get_by_id(dept_id)
-    if dept is None:
-        from app.core.exceptions import NotFoundError
-        raise NotFoundError("部门不存在")
+    dept = await svc.get(dept_id)
     return DepartmentOut.model_validate(dept)
 
 
@@ -123,11 +119,11 @@ async def delete_department(
     await _svc(db, cache).delete(dept_id)
 
 
-@router.get("/{dept_id}/users", response_model=list)
+@router.get("/{dept_id}/users", response_model=list[UserOut])
 async def list_dept_users(
     dept_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     cache: DepartmentCache = Depends(get_department_cache),
     _: User = Depends(require_permission("dept:read")),
-):
+) -> list[UserOut]:
     return await _svc(db, cache).list_users(dept_id)

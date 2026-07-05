@@ -26,6 +26,14 @@ def test_department_update_excludes_parent_id():
     assert "status" in fields
 
 
+def test_department_update_status_literal():
+    assert DepartmentUpdate(status="ACTIVE").status == "ACTIVE"
+    assert DepartmentUpdate(status="INACTIVE").status == "INACTIVE"
+    assert DepartmentUpdate().status is None
+    with pytest.raises(ValueError):
+        DepartmentUpdate(status="BOGUS")
+
+
 def test_department_move_optional_parent():
     assert DepartmentMove(parent_id=None).parent_id is None
     uid = uuid.uuid4()
