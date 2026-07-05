@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Redis（可选，测试不依赖）
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # 缓存开关(测试置 False 强制 Noop 降级)
+    CACHE_ENABLED: bool = True
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
