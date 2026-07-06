@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.domain.models.associations  # noqa: F401
 import app.domain.models.department  # noqa: F401
 import app.domain.models.role  # noqa: F401
+import app.domain.models.system_config  # noqa: F401
 import app.domain.models.user  # noqa: F401
 from app.core.config import settings
 from app.core.database import engine
