@@ -25,6 +25,7 @@ def test_system_config_columns():
 def test_config_history_columns():
     cols = {c.name for c in inspect(Base.metadata.tables["config_history"]).columns}
     assert {"id", "config_key", "old_value", "new_value", "changed_by", "changed_at"} <= cols
+    assert Base.metadata.tables["config_history"].columns["changed_at"].index is True
 
 
 def test_email_template_columns():
