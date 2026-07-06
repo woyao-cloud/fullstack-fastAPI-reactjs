@@ -24,6 +24,20 @@ from app.domain.models.role import Permission, Role
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def _encryption_key(monkeypatch):
+    from cryptography.fernet import Fernet
+
+    from app.core import config as _config
+
+    monkeypatch.setattr(
+        _config.settings, "CONFIG_ENCRYPTION_KEY", Fernet.generate_key().decode()
+    )
+    # crypto 模块缓存了 _fernet,重置以用新密钥
+    from app.core import crypto
+    crypto._fernet = None
+
+
 @pytest.fixture(scope="session")
 def db_file():
     fd, path = tempfile.mkstemp(suffix=".db")

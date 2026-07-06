@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # 缓存开关(测试置 False 强制 Noop 降级)
     CACHE_ENABLED: bool = True
 
+    # 配置加密密钥(Fernet,启动期必须提供)
+    CONFIG_ENCRYPTION_KEY: str = ""  # 生产由 .env 注入;测试由 fixture 注入
+    # 配置缓存开关(测试置 False 强制 LocalTTLCache)
+    CONFIG_CACHE_ENABLED: bool = True
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
