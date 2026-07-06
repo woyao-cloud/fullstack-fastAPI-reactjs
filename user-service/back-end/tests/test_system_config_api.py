@@ -57,7 +57,10 @@ async def test_regular_user_forbidden(client):
     reg = await client.post("/api/v1/auth/register", json={
         "email": "r@t.com", "password": "Rr@12345", "first_name": "R", "last_name": "L"})
     assert reg.status_code == 201
-    login = await client.post("/api/v1/auth/login", json={"email": "r@t.com", "password": "Rr@12345"})
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "r@t.com", "password": "Rr@12345"},
+    )
     token = login.json()["access_token"]
     resp = await client.put("/api/v1/config/system.site_name",
                             json={"value": "x"}, headers=await _h(token))

@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.deps import get_db
+from app.application.services.config_service import ConfigService
+from app.core import crypto
 from app.core.config_cache import ConfigCache, get_config_cache
 from app.core.security import require_permission
 from app.domain.models.user import User
 from app.repositories.system_config_repository import (
-    ConfigHistoryRepository, SystemConfigRepository,
+    ConfigHistoryRepository,
+    SystemConfigRepository,
 )
-from app.application.services.config_service import ConfigService
-from app.core import crypto
 
 router = APIRouter(prefix="/config", tags=["config"])
 
@@ -42,6 +41,34 @@ def _mask(values: dict, group: str) -> dict:
     return masked
 
 
+def _format_history(rows, key: str) -> list[dict]:
+    from app.application.schemas.system_config import GROUP_MODELS, group_of_key
+    group = group_of_key(key)
+    field = key.split(".", 1)[1]
+    fi = GROUP_MODELS[group].model_fields.get(field)
+    is_secret = fi is not None and "SecretStr" in str(fi.annotation)
+    return [
+        {
+            "key": r.config_key,
+            "old_value": "***" if is_secret else r.old_value,
+            "new_value": "***" if is_secret else r.new_value,
+            "changed_by": str(r.changed_by),
+            "changed_at": r.changed_at.isoformat() if r.changed_at else None,
+        }
+        for r in rows
+    ]
+
+
+def _get_value_result(values: dict, key: str, group: str) -> dict:
+    from app.application.schemas.system_config import GROUP_MODELS
+    field = key.split(".", 1)[1]
+    val = values.get(field)
+    fi = GROUP_MODELS[group].model_fields.get(field)
+    if fi is not None and "SecretStr" in str(fi.annotation):
+        val = "***"
+    return {"key": key, "group": group, "value": val}
+
+
 @router.get("/groups")
 async def list_groups(
     db: AsyncSession = Depends(get_db),
@@ -59,8 +86,7 @@ async def get_group(
     user: User = Depends(require_permission("config:read")),
 ) -> dict:
     svc = _svc(db, cache)
-    values = await svc.get_group(group)
-    return {"group": group, "values": _mask(values, group)}
+    return {"group": group, "values": _mask(await svc.get_group(group), group)}
 
 
 @router.get("/history")
@@ -71,22 +97,7 @@ async def history(
     user: User = Depends(require_permission("config:read")),
 ) -> list[dict]:
     repo = ConfigHistoryRepository(db)
-    rows = await repo.list_by_key(key)
-    from app.application.schemas.system_config import group_of_key, GROUP_MODELS
-    group = group_of_key(key)
-    field = key.split(".", 1)[1]
-    fi = GROUP_MODELS[group].model_fields.get(field)
-    is_secret = fi is not None and "SecretStr" in str(fi.annotation)
-    out = []
-    for r in rows:
-        out.append({
-            "key": r.config_key,
-            "old_value": "***" if is_secret else r.old_value,
-            "new_value": "***" if is_secret else r.new_value,
-            "changed_by": str(r.changed_by),
-            "changed_at": r.changed_at.isoformat() if r.changed_at else None,
-        })
-    return out
+    return _format_history(await repo.list_by_key(key), key)
 
 
 @router.get("/{key}")
@@ -96,16 +107,10 @@ async def get_value(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:read")),
 ) -> dict:
+    from app.application.schemas.system_config import group_of_key
     svc = _svc(db, cache)
-    from app.application.schemas.system_config import group_of_key, GROUP_MODELS
     group = group_of_key(key)
-    values = await svc.get_group(group)
-    field = key.split(".", 1)[1]
-    val = values.get(field)
-    fi = GROUP_MODELS[group].model_fields.get(field)
-    if fi is not None and "SecretStr" in str(fi.annotation):
-        val = "***"
-    return {"key": key, "group": group, "value": val}
+    return _get_value_result(await svc.get_group(group), key, group)
 
 
 @router.put("/{key}")

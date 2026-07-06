@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -14,11 +16,18 @@ import app.domain.models.department  # noqa: F401
 import app.domain.models.role  # noqa: F401
 import app.domain.models.system_config  # noqa: F401
 import app.domain.models.user  # noqa: F401
+from app.application.services.config_service import ConfigService
+from app.core import crypto
 from app.core.config import settings
-from app.core.database import engine
+from app.core.config_cache import get_config_cache
+from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import register_exception_handlers
 from app.domain.models import Base
 from app.interfaces.api import auth, departments, email_templates, health, system_config, users
+from app.repositories.system_config_repository import (
+    ConfigHistoryRepository,
+    SystemConfigRepository,
+)
 
 
 @asynccontextmanager
@@ -26,7 +35,25 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # 测试/开发环境自动建表；生产应使用 Alembic 迁移
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # 配置缓存订阅(Redis 实现时;本地 no-op)
+    cache = await get_config_cache()
+    subscriber_task = asyncio.create_task(cache.start_subscriber())
+    # 幂等初始化默认配置(全零 UUID 作为系统操作人)
+    async with AsyncSessionLocal() as session:
+        svc = ConfigService(
+            session,
+            SystemConfigRepository(session),
+            ConfigHistoryRepository(session),
+            crypto,
+            cache,
+        )
+        await svc.init_default_configs(uuid.UUID(int=0))
     yield
+    subscriber_task.cancel()
+    try:
+        await subscriber_task
+    except asyncio.CancelledError:
+        pass
     await engine.dispose()
 
 

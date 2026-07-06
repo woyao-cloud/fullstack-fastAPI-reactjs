@@ -4,7 +4,11 @@ import pytest
 from pydantic import ValidationError
 
 from app.application.schemas.system_config import (
-    GROUP_MODELS, MailConfig, SecurityPolicy, SystemParams, group_of_key,
+    GROUP_MODELS,
+    MailConfig,
+    SecurityPolicy,
+    SystemParams,
+    group_of_key,
 )
 
 pytestmark = pytest.mark.asyncio

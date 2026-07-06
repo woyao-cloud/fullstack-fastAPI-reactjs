@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.application.services.config_service import ConfigService
 from app.core import crypto
 from app.core.config_cache import LocalTTLCache
-from app.core.exceptions import BusinessException, NotFoundError
+from app.core.exceptions import BusinessException
 from app.repositories.system_config_repository import (
-    ConfigHistoryRepository, SystemConfigRepository,
+    ConfigHistoryRepository,
+    SystemConfigRepository,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -122,7 +123,10 @@ async def test_cache_invalidation_on_set(engine, seed):
 
     async with Session() as db:
         spy = SpyCache()
-        svc = ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db), crypto, spy)
+        svc = ConfigService(
+            db, SystemConfigRepository(db),
+            ConfigHistoryRepository(db), crypto, spy,
+        )
         await svc.init_default_configs(uuid.uuid4())
         await db.commit()
         await svc.set_value("system.site_name", "Z", uuid.uuid4())

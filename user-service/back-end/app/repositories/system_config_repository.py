@@ -20,14 +20,16 @@ class SystemConfigRepository:
         return result.scalar_one_or_none()
 
     async def list_by_group(self, group: str) -> list[SystemConfig]:
-        result = await self.db.execute(select(SystemConfig).where(SystemConfig.config_group == group))
+        stmt = select(SystemConfig).where(SystemConfig.config_group == group)
+        result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
     async def list_keys(self, group: str | None = None) -> list[SystemConfig]:
         stmt = select(SystemConfig)
         if group is not None:
             stmt = stmt.where(SystemConfig.config_group == group)
-        result = await self.db.execute(stmt.order_by(SystemConfig.config_group, SystemConfig.config_key))
+        stmt = stmt.order_by(SystemConfig.config_group, SystemConfig.config_key)
+        result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
     async def upsert(self, key: str, value: str, group: str, type_: str,
@@ -80,7 +82,8 @@ class EmailTemplateRepository:
         return await self.db.get(EmailTemplate, tpl_id)
 
     async def get_by_code(self, code: str) -> EmailTemplate | None:
-        result = await self.db.execute(select(EmailTemplate).where(EmailTemplate.template_code == code))
+        stmt = select(EmailTemplate).where(EmailTemplate.template_code == code)
+        result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
     async def list(self, page: int, size: int) -> tuple[list[EmailTemplate], int]:

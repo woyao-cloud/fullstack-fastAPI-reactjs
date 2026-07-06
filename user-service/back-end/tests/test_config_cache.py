@@ -38,6 +38,42 @@ async def test_factory_returns_local_when_disabled(monkeypatch):
     assert isinstance(cache, LocalTTLCache)
 
 
+async def test_factory_builds_redis_when_enabled(monkeypatch):
+    import app.core.config_cache as mod
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "CONFIG_CACHE_ENABLED", True)
+    monkeypatch.setattr(mod, "_redis_singleton", None)
+
+    async def fake_build():
+        return FakeRedis()
+
+    monkeypatch.setattr(
+        "app.core.redis_config_cache.build_redis_client", fake_build
+    )
+    cache = await get_config_cache()
+    from app.core.redis_config_cache import RedisPubSubConfigCache
+    assert isinstance(cache, RedisPubSubConfigCache)
+    # 第二次调用返回缓存的 singleton
+    cache2 = await get_config_cache()
+    assert cache2 is cache
+
+
+async def test_factory_fallback_on_redis_error(monkeypatch):
+    import app.core.config_cache as mod
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "CONFIG_CACHE_ENABLED", True)
+    monkeypatch.setattr(mod, "_redis_singleton", None)
+
+    async def boom():
+        raise RuntimeError("no redis")
+
+    monkeypatch.setattr(
+        "app.core.redis_config_cache.build_redis_client", boom
+    )
+    cache = await get_config_cache()
+    assert isinstance(cache, LocalTTLCache)
+
+
 def test_protocol_compat():
     assert isinstance(LocalTTLCache(), ConfigCache)
 
@@ -73,7 +109,10 @@ class FakeRedis:
 
             def push(self, channel, message):
                 import types
-                self._queue.append(types.SimpleNamespace(type="message", channel=channel, data=message))
+                msg = types.SimpleNamespace(
+                    type="message", channel=channel, data=message
+                )
+                self._queue.append(msg)
 
             async def close(self):
                 pass

@@ -47,18 +47,21 @@ _local_singleton = LocalTTLCache()
 _redis_singleton: ConfigCache | None = None
 
 
+async def _build_redis_or_fallback() -> ConfigCache:
+    try:
+        from app.core.redis_config_cache import RedisPubSubConfigCache, build_redis_client
+
+        return RedisPubSubConfigCache(await build_redis_client())
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis 不可用,配置缓存降级为 LocalTTLCache: %s", exc)
+        return _local_singleton
+
+
 async def get_config_cache() -> ConfigCache:
     global _redis_singleton
     if not settings.CONFIG_CACHE_ENABLED:
         return _local_singleton
     if _redis_singleton is not None:
         return _redis_singleton
-    try:
-        from app.core.redis_config_cache import RedisPubSubConfigCache, build_redis_client
-
-        client = await build_redis_client()
-        _redis_singleton = RedisPubSubConfigCache(client)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Redis 不可用,配置缓存降级为 LocalTTLCache: %s", exc)
-        _redis_singleton = _local_singleton
+    _redis_singleton = await _build_redis_or_fallback()
     return _redis_singleton

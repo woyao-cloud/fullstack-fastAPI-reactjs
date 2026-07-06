@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 import app.domain.models.associations  # noqa: F401  pylint: disable=unused-import
 import app.domain.models.department  # noqa: F401  pylint: disable=unused-import
 import app.domain.models.role  # noqa: F401  pylint: disable=unused-import
-import app.domain.models.user  # noqa: F401  pylint: disable=unused-import
 import app.domain.models.system_config  # noqa: F401  pylint: disable=unused-import
+import app.domain.models.user  # noqa: F401  pylint: disable=unused-import
 from app.core.database import get_db
 from app.domain.models import Base
 from app.domain.models.enums import DataScope

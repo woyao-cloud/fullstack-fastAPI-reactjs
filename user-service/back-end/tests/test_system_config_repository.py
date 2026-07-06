@@ -6,9 +6,11 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.domain.models.system_config import EmailTemplate, SystemConfig
+from app.domain.models.system_config import EmailTemplate
 from app.repositories.system_config_repository import (
-    ConfigHistoryRepository, EmailTemplateRepository, SystemConfigRepository,
+    ConfigHistoryRepository,
+    EmailTemplateRepository,
+    SystemConfigRepository,
 )
 
 pytestmark = pytest.mark.asyncio

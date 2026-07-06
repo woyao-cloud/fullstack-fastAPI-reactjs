@@ -20,10 +20,13 @@ class SystemConfig(Base):
     config_key: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     config_value: Mapped[str] = mapped_column(Text, nullable=False)
     config_group: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
-    config_type: Mapped[str] = mapped_column(String(20), nullable=False)  # STRING/INT/BOOL/JSON/SECRET
+    # STRING/INT/BOOL/JSON/SECRET
+    config_type: Mapped[str] = mapped_column(String(20), nullable=False)
     is_encrypted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUIDType, ForeignKey("user_account.id"), nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUIDType, ForeignKey("user_account.id"), nullable=True
+    )
 
 
 class ConfigHistory(Base):
@@ -34,7 +37,9 @@ class ConfigHistory(Base):
     old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     changed_by: Mapped[uuid.UUID] = mapped_column(UUIDType, nullable=False)
-    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False, server_default=func.now())
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=False, server_default=func.now()
+    )
 
 
 class EmailTemplate(Base):

@@ -9,7 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.deps import get_db
 from app.application.schemas.system_config import (
-    EmailTemplateCreate, EmailTemplateListOut, EmailTemplateOut, EmailTemplateUpdate,
+    EmailTemplateCreate,
+    EmailTemplateListOut,
+    EmailTemplateOut,
+    EmailTemplateUpdate,
 )
 from app.application.services.email_template_service import EmailTemplateService
 from app.core.security import require_permission
