@@ -120,3 +120,47 @@ All checks passed!
 ## 关注点(ConcERNS)
 - `departments.py` 仍剩 7 行未被 coverage 追踪(line 61-63、78-81),根因为 coverage.py 7.15 + Python 3.13.12 对 async 路由 `await` 后续语句的追踪限制(非真实未覆盖);测试已通过断言证明这些行实际执行。若后续升级 coverage.py 修复该限制,覆盖率将进一步升至 ~98%。
 - `pyproject.toml` 全局忽略 B008 是 FastAPI 项目的标准实践,不影响其他规则的执行。
+---
+
+## Final-Branch Review Fixes (commit 195c602)
+
+针对全分支 review 的 7 项最终修复(最小行为保持改动)。
+
+### Important 1 — `count_children` 忽略软删除子部门
+- `app/repositories/department_repository.py::count_children`: 在 where 增加 `Department.status == "ACTIVE"` 过滤,使软删除(INACTIVE)子部门不再阻止父部门删除。
+- 回归测试 `tests/test_department_repository.py::test_count_children_ignores_soft_deleted`: 软删除一个子部门后 `count_children(parent_id) == 0`。
+
+### Important 2 — `replace_subtree_paths` LIKE 误匹配 + 缺 `/10` 兄弟测试
+- `app/repositories/department_repository.py::replace_subtree_paths`: 选择条件由 `path.like(root_path + "%")` 改为 `or_(path == root_path, path.like(root_path.rstrip("/") + "/%"))`,严格前缀匹配,避免 `/1` 误伤 `/11` 等同级兄弟。导入 `or_`。
+- `move()` 传 `root_path="/1/2/"` 时: `path == "/1/2/"` 无匹配,`LIKE "/1/2/%"` 匹配后代;repo 测试传 `root_path="/1"` 时: `path == "/1"` 匹配根自身,`LIKE "/1/%"` 匹配后代 —— 两种调用契约均满足。
+- 强化 `test_replace_subtree_paths_multidigit`: 新增根级 `/11` 兄弟(node_seq=11),断言其未被 `replace_subtree_paths(root_path="/1", ...)` 触碰。
+
+### Important 3 — `create()` 允许挂到 INACTIVE 父部门
+- `app/application/services/department_service.py::create`: 加载 parent 后增加 `if parent.status != "ACTIVE": raise BusinessException("父部门已停用,无法在其下创建子部门")`。
+- 服务级测试 `test_create_under_inactive_parent_rejected`: 软删除父部门后创建子部门抛 BusinessException。
+
+### Important 4 — `DepartmentService` 缺 `list`/`get`,路由绕过服务层
+- `department_service.py`: 新增 `async def list(page, size) -> tuple[list[Department], int]`(基于 `repo.list_active()` 切片)与 `async def get(dept_id) -> Department`(缺失抛 `NotFoundError`)。
+- `app/interfaces/api/departments.py`: `list_departments` 路由改调 `svc.list(page, size)`;`get_department` 路由改调 `svc.get(dept_id)` 并移除内联 `NotFoundError` 导入。
+- 新增服务级测试 `test_delete_with_only_inactive_child_ok`: 父部门唯一子部门为 INACTIVE 时可被删除(不抛 409)。
+
+### Minor 6 — `DepartmentUpdate.status` 未约束
+- `app/application/schemas/department.py`: `status` 类型由 `str | None = Field(default=None, max_length=20)` 改为 `Literal["ACTIVE", "INACTIVE"] | None = None`,导入 `typing.Literal`。
+- 测试 `test_department_update_status_literal`: 验证 ACTIVE/INACTIVE/None 通过、非法值抛 ValueError。
+
+### Minor 7 — `list_dept_users` response_model 未类型化
+- `app/interfaces/api/departments.py`: 顶部导入 `UserOut`(`from app.application.schemas.user import UserOut`),`list_dept_users` 的 `response_model` 由 `list` 改为 `list[UserOut]` 并加返回类型注解,移除原内联 `UserOut` 导入。
+
+### 测试与质量
+- 部门四测试文件: 43/43 通过(`test_department_repository.py` 8、`test_department_service.py` 15、`test_departments_api.py` 11、`test_department_schema.py` 5)。
+- 全量 `uv run pytest`: 69/69 通过(原 65 + 新增 4)。
+- `uv run ruff check app tests`: 0 error。
+- `uv run pytest --cov=app --cov-report=term-missing`: TOTAL 87%(≥85%);部门文件 `department_service.py` 91%、`department_repository.py` 91%、`departments.py` 96%、`schemas/department.py` 100%。
+
+### 提交
+- SHA: 195c60298550dbeec897648c575565f5fedda7c8
+- Subject: `fix(dept): final-review fixes(count_children ACTIVE filter, replace_subtree_paths or_ selection, INACTIVE-parent reject, service list/get, status Literal, list_dept_users response_model)`
+- 分支: feat/department-management
+
+### 关注点
+- 无。所有修复均为最小行为保持改动,回归全绿,ruff 清零,覆盖率达标。
