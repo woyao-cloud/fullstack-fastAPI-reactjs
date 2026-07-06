@@ -1446,14 +1446,6 @@ class EmailTemplateUpdate(BaseModel):
 
 
 class EmailTemplateOut(BaseModel):
-    model_config = ConfigDict.from_attributes = None  # 占位,见下修正
-```
-> 修正:`EmailTemplateOut` 应为:
-```python
-from pydantic import ConfigDict
-from datetime import datetime
-
-class EmailTemplateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     template_code: str
@@ -1728,6 +1720,10 @@ from app.core import crypto
 router = APIRouter(prefix="/config", tags=["config"])
 
 
+def _svc(db: AsyncSession, cache: ConfigCache) -> ConfigService:
+    return ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db), crypto, cache)
+
+
 class ConfigValueUpdate(BaseModel):
     value: str | int | bool | dict
 
@@ -1751,8 +1747,7 @@ async def list_groups(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:read")),
 ) -> list[str]:
-    return ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db),
-                         crypto, cache).list_groups()
+    return _svc(db, cache).list_groups()
 
 
 @router.get("")
@@ -1762,7 +1757,7 @@ async def get_group(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:read")),
 ) -> dict:
-    svc = ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db), crypto, cache)
+    svc = _svc(db, cache)
     values = await svc.get_group(group)
     return {"group": group, "values": _mask(values, group)}
 
@@ -1774,7 +1769,7 @@ async def get_value(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:read")),
 ) -> dict:
-    svc = ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db), crypto, cache)
+    svc = _svc(db, cache)
     from app.application.schemas.system_config import group_of_key, GROUP_MODELS
     group = group_of_key(key)
     values = await svc.get_group(group)
@@ -1794,7 +1789,7 @@ async def put_value(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:update")),
 ) -> dict:
-    svc = ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db), crypto, cache)
+    svc = _svc(db, cache)
     await svc.set_value(key, req.value, user.id)
     return {"key": key, "ok": True}
 
@@ -1805,7 +1800,7 @@ async def init_configs(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:update")),
 ) -> dict:
-    svc = ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db), crypto, cache)
+    svc = _svc(db, cache)
     await svc.init_default_configs(user.id)
     return {"ok": True}
 
