@@ -41,6 +41,16 @@ class DepartmentRepository:
         )
         return list(result.scalars().all())
 
+    async def get_sub_department_ids(self, dept_id: uuid.UUID) -> list[uuid.UUID]:
+        """返回 dept_id 的子部门 id 列表(不含自身)。"""
+        dept = await self.db.get(Department, dept_id)
+        if dept is None:
+            return []
+        result = await self.db.execute(
+            select(Department.id).where(Department.path.like(f"{dept.path}/%"))
+        )
+        return list(result.scalars().all())
+
     async def count_children(self, parent_id: uuid.UUID) -> int:
         result = await self.db.execute(
             select(func.count())
