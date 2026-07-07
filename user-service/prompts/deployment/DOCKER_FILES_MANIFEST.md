@@ -7,7 +7,7 @@
 ## 文件结构
 
 ```
-usermanagement/
+user-service/
 ├── docker-compose.yml                    # 本地开发环境主配置
 ├── docker-compose.team.yml               # Team 环境主配置
 ├── docker-compose.dev.yml                # 原有配置（保留）
