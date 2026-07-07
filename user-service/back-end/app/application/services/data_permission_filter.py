@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import false, select
+from sqlalchemy import false
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.enums import DataScope

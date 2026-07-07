@@ -35,7 +35,9 @@ class UserRepository:
         result = await self.db.execute(stmt)
         return result.unique().scalars().all(), total
 
-    async def list_from_stmt(self, stmt, page: int = 1, size: int = 20) -> tuple[Sequence[User], int]:
+    async def list_from_stmt(
+        self, stmt, page: int = 1, size: int = 20
+    ) -> tuple[Sequence[User], int]:
         offset = (page - 1) * size
         total_result = await self.db.execute(select(func.count()).select_from(stmt.subquery()))
         total = total_result.scalar_one()

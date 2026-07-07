@@ -53,7 +53,9 @@ class UserService:
             raise NotFoundError("用户不存在")
         return user
 
-    async def list(self, page: int = 1, size: int = 20, current_user: User | None = None) -> tuple[Sequence[User], int]:
+    async def list(
+        self, page: int = 1, size: int = 20, current_user: User | None = None
+    ) -> tuple[Sequence[User], int]:
         stmt = User.with_roles()
         if current_user is not None:
             stmt = await self.filter.apply(stmt, current_user)
