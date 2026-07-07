@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth";
+import { Sidebar } from "@/components/layout/sidebar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -13,5 +14,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isLoading) return <div className="flex min-h-screen items-center justify-center">加载中...</div>;
   if (!isAuthenticated) return null;
-  return <>{children}</>;
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 p-6">{children}</main>
+    </div>
+  );
 }
