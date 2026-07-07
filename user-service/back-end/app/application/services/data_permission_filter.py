@@ -15,7 +15,6 @@ from app.repositories.department_repository import DepartmentRepository
 
 class DataPermissionFilter:
     def __init__(self, db: AsyncSession, dept_repo: DepartmentRepository):
-        self.db = db
         self.dept_repo = dept_repo
 
     @staticmethod
