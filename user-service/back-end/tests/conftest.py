@@ -122,6 +122,8 @@ async def seed(db_session):
     admin = Role(name="管理员", code="ADMIN", data_scope=DataScope.ALL)
     admin.permissions = perms
     user_role = Role(name="普通用户", code="USER", data_scope=DataScope.SELF)
+    # 普通用户可读用户(本人,受 SELF data_scope 限制),但不能增删改/分配角色
+    user_role.permissions = [p for p in perms if p.code == "user:read"]
     db_session.add_all([admin, user_role])
     await db_session.commit()
     return {"admin": admin, "user": user_role, "permissions": perms}

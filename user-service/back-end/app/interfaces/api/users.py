@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.deps import get_db
@@ -21,10 +21,13 @@ async def list_users(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_permission("user:read")),
+    current_user: User = Depends(get_current_user),
 ) -> UserListOut:
+    codes = await current_user.permission_codes()
+    if "user:read" not in codes:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "缺少权限: user:read")
     service = UserService(db)
-    items, total = await service.list(page, size)
+    items, total = await service.list(page, size, current_user=current_user)
     return UserListOut(
         items=[UserOut.model_validate(u) for u in items], total=total, page=page, size=size
     )
@@ -44,18 +47,16 @@ async def create_user(
 async def get_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> UserOut:
-    # 本人可直接查看；否则需要 user:read 权限
-    if current.id != user_id:
-        codes = await current.permission_codes()
-        if "user:read" not in codes:
-            from fastapi import HTTPException, status
-
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "缺少权限: user:read")
-        service = UserService(db)
-        return UserOut.model_validate(await service.get(user_id))
-    return UserOut.model_validate(current)
+    # 本人直查:跳过权限检查与 data_scope 过滤
+    if current_user.id == user_id:
+        return UserOut.model_validate(current_user)
+    codes = await current_user.permission_codes()
+    if "user:read" not in codes:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "缺少权限: user:read")
+    service = UserService(db)
+    return UserOut.model_validate(await service.get(user_id, current_user=current_user))
 
 
 @router.put("/{user_id}", response_model=UserOut)
