@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.deps import get_db
+from app.application.schemas.system_config import ConfigValueUpdate, group_of_key
 from app.application.services.config_service import ConfigService
 from app.core import crypto
 from app.core.config_cache import ConfigCache, get_config_cache
@@ -24,10 +24,6 @@ def _svc(db: AsyncSession, cache: ConfigCache) -> ConfigService:
     return ConfigService(db, SystemConfigRepository(db), ConfigHistoryRepository(db), crypto, cache)
 
 
-class ConfigValueUpdate(BaseModel):
-    value: str | int | bool | dict
-
-
 def _mask(values: dict, group: str) -> dict:
     from app.application.schemas.system_config import GROUP_MODELS
     model = GROUP_MODELS[group]
@@ -41,9 +37,8 @@ def _mask(values: dict, group: str) -> dict:
     return masked
 
 
-def _format_history(rows, key: str) -> list[dict]:
-    from app.application.schemas.system_config import GROUP_MODELS, group_of_key
-    group = group_of_key(key)
+def _format_history(rows, key: str, group: str) -> list[dict]:
+    from app.application.schemas.system_config import GROUP_MODELS
     field = key.split(".", 1)[1]
     fi = GROUP_MODELS[group].model_fields.get(field)
     is_secret = fi is not None and "SecretStr" in str(fi.annotation)
@@ -96,8 +91,12 @@ async def history(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:read")),
 ) -> list[dict]:
+    try:
+        group = group_of_key(key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     repo = ConfigHistoryRepository(db)
-    return _format_history(await repo.list_by_key(key), key)
+    return _format_history(await repo.list_by_key(key), key, group)
 
 
 @router.get("/{key}")
@@ -107,10 +106,16 @@ async def get_value(
     cache: ConfigCache = Depends(get_config_cache),
     user: User = Depends(require_permission("config:read")),
 ) -> dict:
-    from app.application.schemas.system_config import group_of_key
+    try:
+        group = group_of_key(key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     svc = _svc(db, cache)
-    group = group_of_key(key)
-    return _get_value_result(await svc.get_group(group), key, group)
+    values = await svc.get_group(group)
+    field = key.split(".", 1)[1]
+    if field not in values:
+        raise HTTPException(status_code=404, detail=f"配置不存在: {key}")
+    return _get_value_result(values, key, group)
 
 
 @router.put("/{key}")

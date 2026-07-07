@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -47,7 +46,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             crypto,
             cache,
         )
-        await svc.init_default_configs(uuid.UUID(int=0))
+        await svc.init_default_configs(None)
     yield
     subscriber_task.cancel()
     try:

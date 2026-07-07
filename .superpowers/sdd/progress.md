@@ -16,3 +16,24 @@ T8: DRY between _build_tree and get_subtree — acceptable
 
 Final-fix: complete (commits cdd62a1..195c602, re-review clean; 69/69 pass, cov 87%, ruff 0; Important 1-4 + Minor 6-7 fixed)
 ALL 10 TASKS + FINAL REVIEW FIXES COMPLETE. Branch feat/department-management head=195c602.
+
+==== System Config (阶段3) on feat/system-config ====
+C1: complete (commits 5b85747..cae4272 + fix d1e9ac1, review clean + fix clean)
+C2: complete (commits d1e9ac1..33cf225, review clean; minors cosmetic)
+C3: complete (commits 33cf225..16a4cc2, review clean; minor: ge=6 is per-spec)
+C4: complete (commits 16a4cc2..49cdfe6, review clean; minors cosmetic)
+C5: complete (commits 49cdfe6..a7e4d08, review clean; adapted listen->get_message behavior-equivalent; minors: pubsub.close cleanup)
+C6: complete (commits a7e4d08..1065e8e, review clean; 2 approved deviations: conftest import + changed_at server_default)
+C7: complete (commits 1065e8e..58d3bd1 + fix 24a8981, review clean + fix clean; removed wrong DepartmentCache import)
+C8: complete (commits 24a8981..15a2e54, review clean; minors cosmetic)
+C9: complete (commits 15a2e54..cbb531e, review clean; route-order fix /config/history before /{key}; minors cosmetic)
+C10: complete (commits cbb531e..bad2805, review clean; 114/114 pass, cov 89%, ruff 0; async-coverage workaround accepted)
+
+ALL 10 CONFIG TASKS COMPLETE. Branch feat/system-config head=bad2805.
+
+--- Config final-review deferred minors (follow-up) ---
+- _TYPES STRING fallback for non-default keys (acceptable today)
+- _infer_type fragility (works for current defaults)
+- start_subscriber redundant sleep / no reconnect (degradation acceptable)
+- trailing newlines; changed_by no FK (per spec)
+- no Alembic migration yet (deferred per plan)

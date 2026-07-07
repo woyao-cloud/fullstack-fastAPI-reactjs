@@ -153,7 +153,8 @@ class ConfigService:
         await self.cache.invalidate(group)
 
     async def create_or_init(self, key: str, value: Any, group: str, type_: str,
-                             description: str | None, updated_by: uuid.UUID) -> None:
+                             description: str | None,
+                             updated_by: uuid.UUID | None) -> None:
         if await self.repo.get_by_key(key) is not None:
             return  # 幂等
         storage_value, is_encrypted = _to_storage(value, type_, self.crypto)
@@ -161,7 +162,7 @@ class ConfigService:
                                updated_by, description)
         await self.db.commit()
 
-    async def init_default_configs(self, updated_by: uuid.UUID) -> None:
+    async def init_default_configs(self, updated_by: uuid.UUID | None = None) -> None:
         for group, fields in _DEFAULTS.items():
             for field, value in fields.items():
                 key = f"{_PREFIX[group]}.{field}"

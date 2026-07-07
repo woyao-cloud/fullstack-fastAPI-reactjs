@@ -27,23 +27,25 @@ async def test_init_default_configs_seeds_all(engine, seed):
     Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     async with Session() as db:
         svc = _svc(db)
-        await svc.init_default_configs(uuid.uuid4())
+        await svc.init_default_configs(None)
         await db.commit()
         rows = await svc.repo.list_keys()
         groups = {r.config_group for r in rows}
         assert groups == {"MAIL", "SECURITY", "PERFORMANCE", "SYSTEM"}
         # 每组至少 1 个 key
         assert len(rows) >= 4
+        # 启动调用传 None,seeds 行 updated_by 为 None
+        assert all(r.updated_by is None for r in rows)
 
 
 async def test_init_idempotent(engine, seed):
     Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     async with Session() as db:
         svc = _svc(db)
-        await svc.init_default_configs(uuid.uuid4())
+        await svc.init_default_configs(None)
         await db.commit()
         first = sorted(r.config_value for r in await svc.repo.list_keys())
-        await svc.init_default_configs(uuid.uuid4())  # 不覆盖
+        await svc.init_default_configs(None)  # 不覆盖
         await db.commit()
         second = sorted(r.config_value for r in await svc.repo.list_keys())
         assert first == second

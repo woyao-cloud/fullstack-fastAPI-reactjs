@@ -41,8 +41,8 @@ class RedisPubSubConfigCache:
             logger.warning("config cache publish 失败,降级: %s", exc)
 
     async def start_subscriber(self) -> None:
+        pubsub = self._redis.pubsub()
         try:
-            pubsub = self._redis.pubsub()
             await pubsub.subscribe(CHANNEL)
             while True:
                 msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
@@ -61,3 +61,7 @@ class RedisPubSubConfigCache:
             raise
         except Exception as exc:  # noqa: BLE001
             logger.warning("config cache 订阅断开,降级为本地 TTL: %s", exc)
+        finally:
+            close = getattr(pubsub, "aclose", None) or getattr(pubsub, "close", None)
+            if close is not None:
+                await close()

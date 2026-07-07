@@ -64,6 +64,10 @@ GROUP_MODELS = {
 }
 
 
+class ConfigValueUpdate(BaseModel):
+    value: str | int | bool | dict
+
+
 class EmailTemplateCreate(BaseModel):
     template_code: str = Field(min_length=1, max_length=50)
     template_name: str = Field(min_length=1, max_length=100)
