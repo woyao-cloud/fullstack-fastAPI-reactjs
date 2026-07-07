@@ -22,7 +22,7 @@ class UserService:
         self.users = UserRepository(db)
         self.roles = RoleRepository(db)
 
-    async def create(self, req: UserCreate) -> User:
+    async def create(self, req: UserCreate, actor: User | None = None) -> User:
         if await self.users.get_by_email(req.email) is not None:
             raise ConflictError("邮箱已注册")
         user = User(
@@ -33,6 +33,7 @@ class UserService:
             phone=req.phone,
             department_id=req.department_id,
             status=UserStatus.ACTIVE,
+            created_by=actor.id if actor is not None else None,
         )
         await self.users.add(user)
         await self.db.commit()

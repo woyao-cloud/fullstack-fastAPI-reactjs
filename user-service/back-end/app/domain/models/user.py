@@ -44,6 +44,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_login_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUIDType, ForeignKey("user_account.id"), nullable=True, index=True
+    )
+
     roles: Mapped[list[Role]] = relationship(
         secondary="user_role", back_populates="users", lazy="selectin"
     )

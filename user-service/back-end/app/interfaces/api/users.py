@@ -34,10 +34,10 @@ async def list_users(
 async def create_user(
     req: UserCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_permission("user:create")),
+    current_user: User = Depends(require_permission("user:create")),
 ) -> UserOut:
     service = UserService(db)
-    return UserOut.model_validate(await service.create(req))
+    return UserOut.model_validate(await service.create(req, actor=current_user))
 
 
 @router.get("/{user_id}", response_model=UserOut)
