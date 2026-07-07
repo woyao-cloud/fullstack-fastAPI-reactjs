@@ -165,3 +165,56 @@ async def test_filter_dept_no_department_empty(engine, seed):
         f = DataPermissionFilter(db, DepartmentRepository(db))
         result = await db.execute(await f.apply(select(User), me))
         assert result.scalars().all() == []  # 空集
+
+
+# --- Task 3: UserService.list/get 集成 current_user ---
+from app.core.exceptions import NotFoundError
+
+
+async def test_service_list_filtered_self(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        s_role = Role(name="SELC", code="D_SELC", data_scope=DataScope.SELF)
+        db.add(s_role); await db.flush()
+        me = await _make_user(db, "me2@t.com", roles=[s_role])
+        mine = await _make_user(db, "mine2@t.com", created_by=me.id)
+        other = await _make_user(db, "other2@t.com")
+        await db.commit()
+        svc = UserService(db)
+        items, total = await svc.list(1, 20, current_user=me)
+        ids = {u.id for u in items}
+        assert mine.id in ids and other.id not in ids
+        assert total == 1
+
+
+async def test_service_list_no_current_user_no_filter(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        a = await _make_user(db, "x@t.com"); b = await _make_user(db, "y@t.com"); await db.commit()
+        svc = UserService(db)
+        items, total = await svc.list(1, 20, current_user=None)
+        assert total >= 2
+
+
+async def test_service_get_filtered_returns_404(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        s_role = Role(name="SELD", code="D_SELD", data_scope=DataScope.SELF)
+        db.add(s_role); await db.flush()
+        me = await _make_user(db, "me3@t.com", roles=[s_role])
+        other = await _make_user(db, "other3@t.com")  # 非 me 创建
+        await db.commit()
+        svc = UserService(db)
+        # me 无权看 other(SELF)→ 404
+        with pytest.raises(NotFoundError):
+            await svc.get(other.id, current_user=me)
+
+
+async def test_service_get_self_can_see_own(engine, seed):
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with Session() as db:
+        a = await _make_user(db, "own@t.com"); await db.commit()
+        svc = UserService(db)
+        # 无 current_user(向后兼容)能查
+        got = await svc.get(a.id, current_user=None)
+        assert got.id == a.id

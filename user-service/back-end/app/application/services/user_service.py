@@ -8,10 +8,12 @@ from collections.abc import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.schemas.user import UserCreate, UserUpdate
+from app.application.services.data_permission_filter import DataPermissionFilter
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.security import hash_password
 from app.domain.models.enums import UserStatus
 from app.domain.models.user import User
+from app.repositories.department_repository import DepartmentRepository
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 
@@ -21,6 +23,7 @@ class UserService:
         self.db = db
         self.users = UserRepository(db)
         self.roles = RoleRepository(db)
+        self.filter = DataPermissionFilter(db, DepartmentRepository(db))
 
     async def create(self, req: UserCreate, actor: User | None = None) -> User:
         if await self.users.get_by_email(req.email) is not None:
@@ -40,14 +43,21 @@ class UserService:
         await self.db.refresh(user)
         return user
 
-    async def get(self, user_id: uuid.UUID) -> User:
-        user = await self.users.get_by_id(user_id)
+    async def get(self, user_id: uuid.UUID, current_user: User | None = None) -> User:
+        stmt = User.with_roles().where(User.id == user_id)
+        if current_user is not None:
+            stmt = await self.filter.apply(stmt, current_user)
+        result = await self.db.execute(stmt)
+        user = result.unique().scalar_one_or_none()
         if user is None:
             raise NotFoundError("用户不存在")
         return user
 
-    async def list(self, page: int = 1, size: int = 20) -> tuple[Sequence[User], int]:
-        return await self.users.list(page, size)
+    async def list(self, page: int = 1, size: int = 20, current_user: User | None = None) -> tuple[Sequence[User], int]:
+        stmt = User.with_roles()
+        if current_user is not None:
+            stmt = await self.filter.apply(stmt, current_user)
+        return await self.users.list_from_stmt(stmt, page, size)
 
     async def update(self, user_id: uuid.UUID, req: UserUpdate) -> User:
         user = await self.get(user_id)
