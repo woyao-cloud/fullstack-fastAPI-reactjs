@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { roleApi } from "@/lib/api/roles";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 import { RoleFormDialog } from "./role-form-dialog";
 import type { PermissionOut, RoleOut } from "@/types/user";
 
@@ -20,40 +21,47 @@ export function RoleList() {
   const [showCreate, setShowCreate] = useState(false);
   const [deleteRole, setDeleteRole] = useState<RoleOut | null>(null);
 
-  const fetchRoles = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [rolesData, permsData] = await Promise.all([
-        roleApi.list(),
-        roleApi.listPermissions(),
-      ]);
-      setRoles(rolesData);
-      setPermissions(permsData);
-    } catch (e) {
-      console.error("Failed to fetch roles", e);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [rolesData, permsData] = await Promise.all([
+          roleApi.list(),
+          roleApi.listPermissions(),
+        ]);
+        if (!cancelled) { setRoles(rolesData); setPermissions(permsData); }
+      } catch (e) {
+        if (!cancelled) console.error("Failed to fetch roles", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   const handleDelete = async () => {
     if (!deleteRole) return;
     try {
       await roleApi.delete(deleteRole.id);
       setDeleteRole(null);
-      fetchRoles();
+      window.location.reload();
     } catch (e) {
       console.error("Failed to delete role", e);
     }
+  };
+
+  const handleSaved = () => {
+    window.location.reload();
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">角色管理</h1>
-        <Button onClick={() => setShowCreate(true)}>创建角色</Button>
+        <PermissionGuard code="role:create">
+          <Button onClick={() => setShowCreate(true)}>创建角色</Button>
+        </PermissionGuard>
       </div>
 
       <div className="rounded-md border">
@@ -94,8 +102,12 @@ export function RoleList() {
                         <Button variant="ghost" size="icon">⋯</Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditRole(r)}>编辑</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setDeleteRole(r)} className="text-destructive">删除</DropdownMenuItem>
+                        <PermissionGuard code="role:update">
+                          <DropdownMenuItem onClick={() => setEditRole(r)}>编辑</DropdownMenuItem>
+                        </PermissionGuard>
+                        <PermissionGuard code="role:delete">
+                          <DropdownMenuItem onClick={() => setDeleteRole(r)} className="text-destructive">删除</DropdownMenuItem>
+                        </PermissionGuard>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -110,7 +122,7 @@ export function RoleList() {
         <RoleFormDialog
           open={showCreate}
           onOpenChange={setShowCreate}
-          onSaved={() => { setShowCreate(false); fetchRoles(); }}
+          onSaved={handleSaved}
           allPermissions={permissions}
         />
       )}
@@ -118,7 +130,7 @@ export function RoleList() {
         <RoleFormDialog
           open={!!editRole}
           onOpenChange={() => setEditRole(null)}
-          onSaved={() => { setEditRole(null); fetchRoles(); }}
+          onSaved={handleSaved}
           role={editRole}
           allPermissions={permissions}
         />

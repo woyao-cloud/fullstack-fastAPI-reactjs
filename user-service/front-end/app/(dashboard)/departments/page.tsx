@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DepartmentTree } from "@/components/departments/department-tree";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 import { DepartmentFormDialog } from "@/components/departments/department-form-dialog";
 import { DepartmentMembers } from "@/components/departments/department-members";
 import type { DepartmentOut, DepartmentTreeNode } from "@/types/user";
@@ -65,7 +66,9 @@ export default function DepartmentsPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">部门管理</h1>
-        <Button onClick={() => setShowCreate(true)}>创建部门</Button>
+        <PermissionGuard code="dept:create">
+          <Button onClick={() => setShowCreate(true)}>创建部门</Button>
+        </PermissionGuard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -93,8 +96,12 @@ export default function DepartmentsPage() {
                   <p className="text-sm"><span className="font-medium">排序：</span>{selectedDept.sort_order}</p>
                   <p className="text-sm"><span className="font-medium">状态：</span>{selectedDept.status}</p>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" onClick={() => setShowEdit(true)}>编辑</Button>
-                    <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)}>删除</Button>
+                    <PermissionGuard code="dept:update">
+                      <Button variant="outline" onClick={() => setShowEdit(true)}>编辑</Button>
+                    </PermissionGuard>
+                    <PermissionGuard code="dept:delete">
+                      <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)}>删除</Button>
+                    </PermissionGuard>
                   </div>
                 </CardContent>
               </Card>
