@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     # 缓存开关(测试置 False 强制 Noop 降级)
     CACHE_ENABLED: bool = True
 
+    # 缓存 TTL（秒）
+    CACHE_DEPT_TREE_TTL: int = 1800  # 部门树 30 分钟
+    CACHE_DEPT_SUBTREE_TTL: int = 1800  # 子树 ID 30 分钟
+    CACHE_CONFIG_TTL: int = 60  # 系统配置 1 分钟
+    CACHE_USER_INFO_TTL: int = 300  # 用户信息 5 分钟
+    CACHE_PERMISSION_TTL: int = 300  # 权限 5 分钟
+
     # 配置加密密钥(Fernet,启动期必须提供)
     CONFIG_ENCRYPTION_KEY: str = ""  # 生产由 .env 注入;测试由 fixture 注入
     # 配置缓存开关(测试置 False 强制 LocalTTLCache)
