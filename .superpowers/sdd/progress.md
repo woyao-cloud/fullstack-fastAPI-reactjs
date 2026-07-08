@@ -38,6 +38,19 @@ ALL 10 CONFIG TASKS COMPLETE. Branch feat/system-config head=bad2805.
 - trailing newlines; changed_by no FK (per spec)
 - no Alembic migration yet (deferred per plan)
 
+==== Data Permission (阶段4) on feat/data-permission ====
+DP1: complete (commits ca535d0..d5b562a, review clean; minors: unused uuid import -> DP5 ruff)
+DP2: complete (commits d5b562a..0151719, review clean; helper greenlet fix accepted; minors cosmetic)
+DP3: complete (commits 0151719..d623899, review clean; minors cosmetic)
+DP4: complete (commits d623899..b824633, review clean; deviations accepted: test_users.py filename + USER role user:read seed)
+DP5: complete (commits b824633..8113c59, review clean; 131/131, cov 90%, filter 97%, ruff 0)
+ALL 5 DATA-PERMISSION TASKS COMPLETE. feat/data-permission head=8113c59.
+DP final-fix: complete (commits 8113c59..1e697df, dead self.db removed)
+ALL DATA-PERMISSION COMPLETE. feat/data-permission head=1e697df.
+
+==== Frontend Auth on feat/frontend-auth ====
+F1: complete (commits ae54d89..19d4565, review clean; shadcn v4 drift non-blocking)
+
 ==== Gateway (from feat/frontend-auth) ====
 Task 1: complete (commit 057fb58, review clean — scaffolding)
 Task 2: complete (commit 945972d, review clean)
