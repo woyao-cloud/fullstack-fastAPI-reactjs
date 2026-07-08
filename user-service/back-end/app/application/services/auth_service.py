@@ -8,7 +8,9 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.schemas.auth import ChangePasswordRequest, LoginRequest, RegisterRequest, TokenResponse
+from app.application.services.password_policy import PasswordPolicyService
 from app.core.config import settings
+from app.core.config_cache import get_config_cache
 from app.core.exceptions import AuthError, ConflictError
 from app.core.security import (
     create_access_token,
@@ -89,5 +91,9 @@ class AuthService:
             raise AuthError("用户不存在或已禁用")
         if not verify_password(req.old_password, user.password_hash):
             raise AuthError("旧密码错误")
+        # 校验密码策略
+        cache = await get_config_cache()
+        policy = PasswordPolicyService(self.db, cache)
+        await policy.validate(req.new_password)
         user.password_hash = hash_password(req.new_password)
         await self.db.commit()
