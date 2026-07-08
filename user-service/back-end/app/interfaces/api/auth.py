@@ -14,7 +14,7 @@ from app.application.schemas.auth import (
     RegisterRequest,
     TokenResponse,
 )
-from app.application.schemas.user import UserOut
+from app.application.schemas.user import UserOut, UserWithPermissionsOut
 from app.application.services.auth_service import AuthService
 from app.core.security import get_current_user
 from app.domain.models.user import User
@@ -48,6 +48,16 @@ async def login_oauth_form(
 async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     service = AuthService(db)
     return await service.refresh(req.refresh_token)
+
+
+@router.get("/me", response_model=UserWithPermissionsOut)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+) -> UserWithPermissionsOut:
+    return UserWithPermissionsOut(
+        **UserOut.model_validate(current_user).model_dump(),
+        permissions=list(await current_user.permission_codes()),
+    )
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

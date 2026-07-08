@@ -42,6 +42,10 @@ class UserOut(BaseModel):
     last_login_at: str | None
 
 
+class UserWithPermissionsOut(UserOut):
+    permissions: list[str] = []
+
+
 class UserListOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
