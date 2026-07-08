@@ -108,13 +108,24 @@ export function RoleFormDialog({ open, onOpenChange, onSaved, role, allPermissio
           )}
           <div>
             <Label>权限</Label>
-            <div className="border rounded-md p-2 max-h-40 overflow-y-auto grid grid-cols-2 gap-1">
-              {allPermissions.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={selectedPerms.has(p.id)} onChange={() => togglePerm(p.id)} />
-                  {p.code}
-                </label>
-              ))}
+            <div className="border rounded-md p-2 max-h-60 overflow-y-auto space-y-3">
+              {(["MENU", "ACTION", "FIELD", "DATA"] as const).map((type) => {
+                const perms = allPermissions.filter((p) => p.type === type);
+                if (perms.length === 0) return null;
+                return (
+                  <div key={type}>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase">{type}</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      {perms.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input type="checkbox" checked={selectedPerms.has(p.id)} onChange={() => togglePerm(p.id)} />
+                          {p.code}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
           {error && <p className="text-red-500 text-sm">{error}</p>}
