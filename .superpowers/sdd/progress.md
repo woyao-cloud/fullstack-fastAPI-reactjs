@@ -47,3 +47,6 @@ DP5: complete (commits b824633..8113c59, review clean; 131/131, cov 90%, filter 
 ALL 5 DATA-PERMISSION TASKS COMPLETE. feat/data-permission head=8113c59.
 DP final-fix: complete (commits 8113c59..1e697df, dead self.db removed)
 ALL DATA-PERMISSION COMPLETE. feat/data-permission head=1e697df.
+
+==== Frontend Auth on feat/frontend-auth ====
+F1: complete (commits ae54d89..19d4565, review clean; shadcn v4 drift non-blocking)
