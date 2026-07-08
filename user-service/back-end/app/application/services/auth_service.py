@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.application.schemas.auth import ChangePasswordRequest, LoginRequest, RegisterRequest, TokenResponse
 from app.core.config import settings
 from app.core.exceptions import AuthError, ConflictError
 from app.core.security import (
@@ -82,3 +82,12 @@ class AuthService:
             refresh_token=create_refresh_token(user.id),
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
+
+    async def change_password(self, user_id: uuid.UUID, req: ChangePasswordRequest) -> None:
+        user = await self.users.get_by_id(user_id)
+        if user is None or not user.is_active:
+            raise AuthError("用户不存在或已禁用")
+        if not verify_password(req.old_password, user.password_hash):
+            raise AuthError("旧密码错误")
+        user.password_hash = hash_password(req.new_password)
+        await self.db.commit()
