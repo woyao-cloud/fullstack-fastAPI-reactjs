@@ -22,7 +22,7 @@ from app.core.config_cache import get_config_cache
 from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import register_exception_handlers
 from app.domain.models import Base
-from app.interfaces.api import auth, departments, email_templates, health, system_config, users
+from app.interfaces.api import audit_logs, auth, departments, email_templates, health, roles, system_config, users
 from app.repositories.system_config_repository import (
     ConfigHistoryRepository,
     SystemConfigRepository,
@@ -79,6 +79,8 @@ def create_app() -> FastAPI:
     app.include_router(users.router, prefix=settings.API_V1_PREFIX)
     app.include_router(departments.router, prefix=settings.API_V1_PREFIX)
     app.include_router(system_config.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(roles.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(audit_logs.router, prefix=settings.API_V1_PREFIX)
     app.include_router(email_templates.router, prefix=settings.API_V1_PREFIX)
 
     return app
