@@ -20,6 +20,8 @@ dependencies = [
     "redis>=5.0",
     "cachetools>=5.3",
     "cryptography>=43.0",
+    "uvloop>=0.19",
+    "gunicorn>=23.0",
 ]
 
 [project.optional-dependencies]
