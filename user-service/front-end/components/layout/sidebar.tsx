@@ -9,10 +9,12 @@ const navItems = [
   { href: "/dashboard/departments", label: "部门管理", icon: "🏢" },
   { href: "/dashboard/roles", label: "角色管理", icon: "🔑" },
   { href: "/dashboard/config", label: "系统配置", icon: "⚙️" },
+  { href: "/dashboard/audit-logs", label: "审计日志", icon: "📋" },
 ];
 
 const bottomItems = [
   { href: "/dashboard/profile", label: "个人中心", icon: "👤" },
+  { href: "/dashboard/my-history", label: "操作历史", icon: "📜" },
 ];
 
 export function Sidebar() {
