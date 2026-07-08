@@ -6,6 +6,7 @@ const REFRESH_KEY = "refresh_token";
 interface AuthState {
   accessToken: string | null;
   user: UserOut | null;
+  permissions: string[];
   isAuthenticated: boolean;
   isLoading: boolean;
 
@@ -14,6 +15,8 @@ interface AuthState {
   logout: () => void;
   hydrate: () => Promise<void>;
   refreshAccessToken: () => Promise<string | null>;
+  hasPermission: (code: string) => boolean;
+  hasAnyPermission: (codes: string[]) => boolean;
 }
 
 async function apiCall<T>(url: string, options?: RequestInit): Promise<T> {
@@ -28,9 +31,14 @@ async function apiCall<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+interface MeResponse extends UserOut {
+  permissions: string[];
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   user: null,
+  permissions: [],
   isAuthenticated: false,
   isLoading: true,
 
@@ -40,10 +48,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       body: JSON.stringify({ email, password } as LoginRequest),
     });
     localStorage.setItem(REFRESH_KEY, data.refresh_token);
-    const user = await apiCall<UserOut>("/users/me", {
+    const me = await apiCall<MeResponse>("/auth/me", {
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
-    set({ accessToken: data.access_token, user, isAuthenticated: true, isLoading: false });
+    const { permissions, ...user } = me;
+    set({ accessToken: data.access_token, user, permissions, isAuthenticated: true, isLoading: false });
   },
 
   register: async (req) => {
@@ -53,7 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     localStorage.removeItem(REFRESH_KEY);
-    set({ accessToken: null, user: null, isAuthenticated: false, isLoading: false });
+    set({ accessToken: null, user: null, permissions: [], isAuthenticated: false, isLoading: false });
   },
 
   hydrate: async () => {
@@ -65,10 +74,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         body: JSON.stringify({ refresh_token: rt }),
       });
       localStorage.setItem(REFRESH_KEY, data.refresh_token);
-      const user = await apiCall<UserOut>("/users/me", {
+      const me = await apiCall<MeResponse>("/auth/me", {
         headers: { Authorization: `Bearer ${data.access_token}` },
       });
-      set({ accessToken: data.access_token, user, isAuthenticated: true, isLoading: false });
+      const { permissions, ...user } = me;
+      set({ accessToken: data.access_token, user, permissions, isAuthenticated: true, isLoading: false });
     } catch {
       get().logout();
       set({ isLoading: false });
@@ -90,5 +100,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       get().logout();
       return null;
     }
+  },
+
+  hasPermission: (code: string) => {
+    const perms = get().permissions;
+    return perms.includes("*:*") || perms.includes(code);
+  },
+
+  hasAnyPermission: (codes: string[]) => {
+    const perms = get().permissions;
+    return codes.some((c) => perms.includes("*:*") || perms.includes(c));
   },
 }));

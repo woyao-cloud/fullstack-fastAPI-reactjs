@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { userApi } from "@/lib/api/users";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +8,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 import { UserFormDialog } from "./user-form-dialog";
 import { UserDeleteDialog } from "./user-delete-dialog";
 import type { UserOut } from "@/types/user";
@@ -22,34 +23,37 @@ export function UserList() {
   const [showCreate, setShowCreate] = useState(false);
   const pageSize = 20;
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await userApi.list(page, pageSize);
-      setUsers(res.items);
-      setTotal(res.total);
-    } catch (e) {
-      console.error("Failed to fetch users", e);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await userApi.list(page, pageSize);
+        if (!cancelled) { setUsers(res.items); setTotal(res.total); }
+      } catch (e) {
+        if (!cancelled) console.error("Failed to fetch users", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [page]);
-
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const totalPages = Math.ceil(total / pageSize);
 
   const handleSaved = () => {
     setShowCreate(false);
     setEditUser(null);
-    fetchUsers();
+    setPage(1);
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">用户管理</h1>
-        <Button onClick={() => setShowCreate(true)}>创建用户</Button>
+        <PermissionGuard code="user:create">
+          <Button onClick={() => setShowCreate(true)}>创建用户</Button>
+        </PermissionGuard>
       </div>
 
       <div className="rounded-md border">
@@ -83,8 +87,12 @@ export function UserList() {
                         <Button variant="ghost" size="icon">⋯</Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditUser(u)}>编辑</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setDeleteUser(u)} className="text-destructive">删除</DropdownMenuItem>
+                        <PermissionGuard code="user:update">
+                          <DropdownMenuItem onClick={() => setEditUser(u)}>编辑</DropdownMenuItem>
+                        </PermissionGuard>
+                        <PermissionGuard code="user:delete">
+                          <DropdownMenuItem onClick={() => setDeleteUser(u)} className="text-destructive">删除</DropdownMenuItem>
+                        </PermissionGuard>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -124,7 +132,7 @@ export function UserList() {
         <UserDeleteDialog
           open={!!deleteUser}
           onOpenChange={() => setDeleteUser(null)}
-          onDeleted={fetchUsers}
+          onDeleted={() => setPage(1)}
           user={deleteUser}
         />
       )}
