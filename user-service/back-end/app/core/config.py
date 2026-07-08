@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     # 数据库（默认 SQLite 以便本地与测试无外部依赖；生产用 PostgreSQL）
     DATABASE_URL: str = "sqlite+aiosqlite:///./user_service.db"
 
+    # 数据库连接池
+    DB_POOL_SIZE: int = 20  # 核心连接数
+    DB_MAX_OVERFLOW: int = 40  # 最大额外连接数（峰值）
+    DB_POOL_TIMEOUT: int = 30  # 等待连接超时（秒）
+    DB_POOL_PRE_PING: bool = True  # 使用前检查连接健康
+    DB_ECHO_POOL: bool = False  # 连接池日志（调试用）
+    DB_POOL_RECYCLE: int = 1800  # 连接回收时间（秒）
+
     # JWT
     JWT_SECRET_KEY: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
