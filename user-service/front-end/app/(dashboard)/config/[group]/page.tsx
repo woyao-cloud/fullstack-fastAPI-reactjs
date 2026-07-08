@@ -3,7 +3,6 @@ import { useState, useEffect, use } from "react";
 import { configApi } from "@/lib/api/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 
