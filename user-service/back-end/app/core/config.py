@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     CACHE_USER_INFO_TTL: int = 300  # 用户信息 5 分钟
     CACHE_PERMISSION_TTL: int = 300  # 权限 5 分钟
 
+    # Kafka（可选，测试不依赖）
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+    KAFKA_AUDIT_LOG_TOPIC: str = "audit_logs"
+
     # 配置加密密钥(Fernet,启动期必须提供)
     CONFIG_ENCRYPTION_KEY: str = ""  # 生产由 .env 注入;测试由 fixture 注入
     # 配置缓存开关(测试置 False 强制 LocalTTLCache)

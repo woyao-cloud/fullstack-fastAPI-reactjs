@@ -1,4 +1,4 @@
-"""审计日志服务."""
+"""审计日志服务 + Kafka 异步写入."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.kafka import get_kafka_producer
 from app.domain.models.audit_log import AuditLog
 from app.repositories.audit_log_repository import AuditLogRepository
 
@@ -50,4 +51,20 @@ class AuditLogService:
             ip_address=ip_address,
             result=result,
         )
+        # 异步写入 Kafka（失败降级，不影响主流程）
+        try:
+            producer = await get_kafka_producer()
+            await producer.send_audit_log({
+                "user_id": str(user_id) if user_id else None,
+                "username": username,
+                "action": action,
+                "resource": resource,
+                "resource_id": resource_id,
+                "detail": detail,
+                "ip_address": ip_address,
+                "result": result,
+            })
+        except Exception:
+            pass  # Kafka 降级，继续直写 DB
+        # 同步写入 DB（保证数据不丢）
         return await self.repo.add(log)

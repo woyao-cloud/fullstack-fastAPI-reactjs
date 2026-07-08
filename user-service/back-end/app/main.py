@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.core.config_cache import get_config_cache
 from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import register_exception_handlers
+from app.core.kafka import close_kafka_producer, get_kafka_producer
 from app.domain.models import Base
 from app.interfaces.api import audit_logs, auth, departments, email_templates, health, roles, system_config, users
 from app.repositories.system_config_repository import (
@@ -37,6 +38,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # 配置缓存订阅(Redis 实现时;本地 no-op)
     cache = await get_config_cache()
     subscriber_task = asyncio.create_task(cache.start_subscriber())
+    # Kafka producer 启动(失败降级)
+    await get_kafka_producer()
     # 幂等初始化默认配置(全零 UUID 作为系统操作人)
     async with AsyncSessionLocal() as session:
         svc = ConfigService(
@@ -53,6 +56,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await subscriber_task
     except asyncio.CancelledError:
         pass
+    await close_kafka_producer()
     await engine.dispose()
 
 
