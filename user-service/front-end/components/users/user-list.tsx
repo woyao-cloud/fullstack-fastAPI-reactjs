@@ -21,14 +21,15 @@ export function UserList() {
   const [editUser, setEditUser] = useState<UserOut | null>(null);
   const [deleteUser, setDeleteUser] = useState<UserOut | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const pageSize = 4;
+  const [search, setSearch] = useState("");
+  const pageSize = 20;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const res = await userApi.list(page, pageSize);
+        const res = await userApi.list(page, pageSize, search || undefined);
         if (!cancelled) { setUsers(res.items); setTotal(res.total); }
       } catch (e) {
         if (!cancelled) console.error("Failed to fetch users", e);
@@ -37,7 +38,7 @@ export function UserList() {
       }
     })();
     return () => { cancelled = true; };
-  }, [page]);
+  }, [page, search]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -51,9 +52,18 @@ export function UserList() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">用户管理</h1>
-        <PermissionGuard code="user:create">
-          <Button onClick={() => setShowCreate(true)}>创建用户</Button>
-        </PermissionGuard>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="搜索邮箱或姓名..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm w-60"
+          />
+          <PermissionGuard code="user:create">
+            <Button onClick={() => setShowCreate(true)}>创建用户</Button>
+          </PermissionGuard>
+        </div>
       </div>
 
       <div className="rounded-md border">
