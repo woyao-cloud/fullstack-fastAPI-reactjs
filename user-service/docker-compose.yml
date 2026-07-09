@@ -7,7 +7,7 @@
 services:
   # --- 数据库 ---
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: user_service
       POSTGRES_USER: user_service
@@ -35,7 +35,7 @@ services:
 
   # --- 消息队列 ---
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.6.0
     depends_on:
       kafka-zookeeper:
         condition: service_started
