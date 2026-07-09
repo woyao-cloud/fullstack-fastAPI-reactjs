@@ -54,9 +54,14 @@ class UserService:
         return user
 
     async def list(
-        self, page: int = 1, size: int = 20, current_user: User | None = None
+        self, page: int = 1, size: int = 20, search: str | None = None, current_user: User | None = None
     ) -> tuple[Sequence[User], int]:
         stmt = User.with_roles()
+        if search:
+            pattern = f"%{search}%"
+            stmt = stmt.where(
+                User.email.ilike(pattern) | User.first_name.ilike(pattern) | User.last_name.ilike(pattern)
+            )
         if current_user is not None:
             stmt = await self.filter.apply(stmt, current_user)
         return await self.users.list_from_stmt(stmt, page, size)

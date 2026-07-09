@@ -22,7 +22,7 @@ export function UserList() {
   const [deleteUser, setDeleteUser] = useState<UserOut | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState("");
-  const pageSize = 20;
+  const pageSize = 4;
 
   useEffect(() => {
     let cancelled = false;

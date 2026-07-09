@@ -20,6 +20,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def list_users(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    search: str | None = Query(None, description="搜索关键词(匹配邮箱/姓名)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UserListOut:
@@ -27,7 +28,7 @@ async def list_users(
     if "user:read" not in codes:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "缺少权限: user:read")
     service = UserService(db)
-    items, total = await service.list(page, size, current_user=current_user)
+    items, total = await service.list(page, size, search=search, current_user=current_user)
     return UserListOut(
         items=[UserOut.model_validate(u) for u in items], total=total, page=page, size=size
     )
