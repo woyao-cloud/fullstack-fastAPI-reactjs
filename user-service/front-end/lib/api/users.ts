@@ -2,8 +2,8 @@ import api from "./client";
 import type { UserCreate, UserListOut, UserOut, UserUpdate } from "@/types/user";
 
 export const userApi = {
-  list: (page = 1, size = 20) =>
-    api.get<UserListOut>("/users", { params: { page, size } }).then((r) => r.data),
+  list: (page = 1, size = 20, search?: string) =>
+    api.get<UserListOut>("/users", { params: { page, size, ...(search ? { search } : {}) } }).then((r) => r.data),
   get: (id: string) =>
     api.get<UserOut>(`/users/${id}`).then((r) => r.data),
   create: (data: UserCreate) =>
