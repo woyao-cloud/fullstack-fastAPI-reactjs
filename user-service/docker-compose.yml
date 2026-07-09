@@ -72,6 +72,18 @@ services:
     ports:
       - "8000:8000"
 
+  # --- 数据初始化（一次性） ---
+  seed:
+    build:
+      context: ./back-end
+      dockerfile: Dockerfile.seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user_service:change-me-in-production@postgres:5432/user_service
+    restart: "no"
+
   # --- 前端 ---
   frontend:
     build:
