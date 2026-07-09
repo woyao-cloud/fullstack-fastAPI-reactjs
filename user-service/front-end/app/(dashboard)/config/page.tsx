@@ -46,7 +46,7 @@ export default function ConfigPage() {
           <Card
             key={group}
             className="cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => router.push(`/dashboard/config/${group.toLowerCase()}`)}
+            onClick={() => router.push(`/config/${group.toLowerCase()}`)}
           >
             <CardHeader>
               <CardTitle>{groupLabels[group] || group}</CardTitle>
