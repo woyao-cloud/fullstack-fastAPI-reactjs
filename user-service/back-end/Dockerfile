@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev &
 
 COPY pyproject.toml .
 # 先安装依赖（此时无源码，仅安装 pyproject.toml 声明的依赖）
-RUN pip install --no-cache-dir uvicorn[standard] gunicorn fastapi python-multipart sqlalchemy[asyncio] aiosqlite asyncpg alembic pydantic pydantic-settings email-validator "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt<4.0.0" redis cachetools cryptography aiokafka
+RUN pip install --no-cache-dir uvicorn[standard] fastapi python-multipart sqlalchemy[asyncio] aiosqlite asyncpg alembic pydantic pydantic-settings email-validator "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt<4.0.0" redis cachetools cryptography aiokafka
 
 COPY . .
 
