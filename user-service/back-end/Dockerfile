@@ -1,8 +1,7 @@
 # ============================================================
-# 后端 Dockerfile — 多阶段构建
+# 后端 Dockerfile — 单阶段构建
 # ============================================================
-# 构建阶段
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -10,20 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev &
     rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+# 先安装依赖（此时无源码，仅安装 pyproject.toml 声明的依赖）
+RUN pip install --no-cache-dir uvicorn[standard] gunicorn fastapi python-multipart sqlalchemy[asyncio] aiosqlite asyncpg alembic pydantic pydantic-settings email-validator "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt<4.0.0" redis cachetools cryptography aiokafka
 
 COPY . .
-
-# 运行阶段
-FROM python:3.12-slim AS runner
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /app /app
 
 EXPOSE 8000
 
