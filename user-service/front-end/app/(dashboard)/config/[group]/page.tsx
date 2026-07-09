@@ -60,7 +60,7 @@ export default function ConfigGroupPage({ params }: { params: Promise<{ group: s
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <Link href="/dashboard/config" className="text-sm text-muted-foreground hover:underline">&larr; 返回</Link>
+        <Link href="/config" className="text-sm text-muted-foreground hover:underline">&larr; 返回</Link>
         <h1 className="text-2xl font-bold">{groupNames[group] || group}</h1>
       </div>
 
