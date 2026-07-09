@@ -21,7 +21,7 @@ export function UserList() {
   const [editUser, setEditUser] = useState<UserOut | null>(null);
   const [deleteUser, setDeleteUser] = useState<UserOut | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const pageSize = 20;
+  const pageSize = 4;
 
   useEffect(() => {
     let cancelled = false;
@@ -84,7 +84,7 @@ export function UserList() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger>
-                        <Button variant="ghost" size="icon">⋯</Button>
+                        <span className="inline-flex items-center justify-center size-8 rounded-md hover:bg-muted cursor-pointer text-sm">⋯</span>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <PermissionGuard code="user:update">

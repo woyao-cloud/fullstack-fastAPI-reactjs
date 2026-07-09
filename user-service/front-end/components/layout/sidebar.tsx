@@ -5,16 +5,16 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "仪表板", icon: "📊" },
-  { href: "/dashboard/users", label: "用户管理", icon: "👥" },
-  { href: "/dashboard/departments", label: "部门管理", icon: "🏢" },
-  { href: "/dashboard/roles", label: "角色管理", icon: "🔑" },
-  { href: "/dashboard/config", label: "系统配置", icon: "⚙️" },
-  { href: "/dashboard/audit-logs", label: "审计日志", icon: "📋" },
+  { href: "/users", label: "用户管理", icon: "👥" },
+  { href: "/departments", label: "部门管理", icon: "🏢" },
+  { href: "/roles", label: "角色管理", icon: "🔑" },
+  { href: "/config", label: "系统配置", icon: "⚙️" },
+  { href: "/audit-logs", label: "审计日志", icon: "📋" },
 ];
 
 const bottomItems = [
-  { href: "/dashboard/profile", label: "个人中心", icon: "👤" },
-  { href: "/dashboard/my-history", label: "操作历史", icon: "📜" },
+  { href: "/profile", label: "个人中心", icon: "👤" },
+  { href: "/my-history", label: "操作历史", icon: "📜" },
 ];
 
 export function Sidebar() {
