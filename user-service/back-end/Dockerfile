@@ -27,4 +27,4 @@ COPY --from=builder /app /app
 
 EXPOSE 8000
 
-CMD ["gunicorn", "app.main:app", "-c", "gunicorn.conf.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
