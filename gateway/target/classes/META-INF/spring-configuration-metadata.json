@@ -1,0 +1,114 @@
+{
+  "groups": [
+    {
+      "name": "gateway.auth",
+      "type": "com.gateway.filter.AuthProperties",
+      "sourceType": "com.gateway.filter.AuthProperties"
+    },
+    {
+      "name": "gateway.auth.blacklist",
+      "type": "com.gateway.filter.AuthProperties$Blacklist",
+      "sourceType": "com.gateway.filter.AuthProperties",
+      "sourceMethod": "blacklist()"
+    },
+    {
+      "name": "gateway.circuit-breaker.ingress",
+      "type": "com.gateway.filter.IngressConfig",
+      "sourceType": "com.gateway.filter.IngressConfig"
+    },
+    {
+      "name": "gateway.ratelimit",
+      "type": "com.gateway.ratelimit.RateLimitConfig",
+      "sourceType": "com.gateway.ratelimit.RateLimitConfig"
+    }
+  ],
+  "properties": [
+    {
+      "name": "gateway.auth.blacklist.degrade-on-failure",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.gateway.filter.AuthProperties$Blacklist",
+      "defaultValue": false
+    },
+    {
+      "name": "gateway.auth.blacklist.redis-timeout",
+      "type": "java.time.Duration",
+      "sourceType": "com.gateway.filter.AuthProperties$Blacklist"
+    },
+    {
+      "name": "gateway.auth.exclude-paths",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "com.gateway.filter.AuthProperties"
+    },
+    {
+      "name": "gateway.auth.jwt-algorithm",
+      "type": "java.lang.String",
+      "sourceType": "com.gateway.filter.AuthProperties"
+    },
+    {
+      "name": "gateway.auth.jwt-secret-key",
+      "type": "java.lang.String",
+      "sourceType": "com.gateway.filter.AuthProperties"
+    },
+    {
+      "name": "gateway.circuit-breaker.ingress.cpu-threshold",
+      "type": "java.lang.Double",
+      "sourceType": "com.gateway.filter.IngressConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "gateway.circuit-breaker.ingress.memory-threshold",
+      "type": "java.lang.Double",
+      "sourceType": "com.gateway.filter.IngressConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "gateway.circuit-breaker.ingress.recover-count",
+      "type": "java.lang.Integer",
+      "sourceType": "com.gateway.filter.IngressConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "gateway.circuit-breaker.ingress.sample-interval",
+      "type": "java.time.Duration",
+      "sourceType": "com.gateway.filter.IngressConfig"
+    },
+    {
+      "name": "gateway.circuit-breaker.ingress.trigger-count",
+      "type": "java.lang.Integer",
+      "sourceType": "com.gateway.filter.IngressConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "gateway.ratelimit.default-limit",
+      "type": "java.lang.Integer",
+      "sourceType": "com.gateway.ratelimit.RateLimitConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "gateway.ratelimit.default-window",
+      "type": "java.time.Duration",
+      "sourceType": "com.gateway.ratelimit.RateLimitConfig"
+    },
+    {
+      "name": "gateway.ratelimit.degrade-on-failure",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.gateway.ratelimit.RateLimitConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "gateway.ratelimit.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.gateway.ratelimit.RateLimitConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "gateway.ratelimit.routes",
+      "type": "java.util.List<com.gateway.ratelimit.RateLimitConfig$RouteLimit>",
+      "sourceType": "com.gateway.ratelimit.RateLimitConfig"
+    }
+  ],
+  "hints": [],
+  "ignored": {
+    "properties": []
+  }
+}

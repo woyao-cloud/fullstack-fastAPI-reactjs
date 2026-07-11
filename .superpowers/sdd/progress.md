@@ -37,3 +37,18 @@ ALL 10 CONFIG TASKS COMPLETE. Branch feat/system-config head=bad2805.
 - start_subscriber redundant sleep / no reconnect (degradation acceptable)
 - trailing newlines; changed_by no FK (per spec)
 - no Alembic migration yet (deferred per plan)
+
+==== Gateway (from feat/frontend-auth) ====
+Task 1: complete (commit 057fb58, review clean — scaffolding)
+Task 2: complete (commit 945972d, review clean)
+Task 3: complete (commit 353db88, 3/3 tests pass)
+Task 4: complete (commit 4852acc, 3/3 tests pass)
+Task 5: complete (commit 4c48647, 4/4 tests pass)
+Task 6: complete (commit 5672e9a, 3/3 tests pass)
+Task 7: complete (commit da89ef4, 2/2 tests pass)
+Task 8: complete (commit a9682f6, 1/1 test pass)
+Task 9: complete (commit 18bfe02, BUILD SUCCESS)
+Task 10: complete (commit 017329b)
+Task 11: complete (commit cd63cfa, 19/19 tests pass)
+Task 12: complete (commit f52dd32, 19/19 tests pass, BUILD SUCCESS)
+Fix: complete (commit 778fcfc, 19/19 tests pass)
