@@ -14,6 +14,7 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,7 +30,7 @@ class AuthGlobalFilterTest {
     private TokenBlacklist blacklist = mock(TokenBlacklist.class);
     private AuthProperties props = new AuthProperties("secret", "HS256",
             List.of("/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh", "/api/v1/auth/login/oauth"),
-            new AuthProperties.Blacklist(50, true));
+            new AuthProperties.Blacklist(Duration.ofMillis(50), true));
     private AuthGlobalFilter filter = new AuthGlobalFilter(jwtParser, blacklist, props);
     private GatewayFilterChain chain = mock(GatewayFilterChain.class);
 

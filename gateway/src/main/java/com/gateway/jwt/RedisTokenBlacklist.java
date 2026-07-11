@@ -19,22 +19,22 @@ public class RedisTokenBlacklist implements TokenBlacklist {
     private static final String USER_PREFIX = "blacklist:user:";
 
     private final ReactiveRedisTemplate<String, String> redis;
-    private final long timeoutMs;
+    private final Duration timeout;
     private final boolean degradeOnFailure;
 
     public RedisTokenBlacklist(ReactiveRedisTemplate<String, String> redis, AuthProperties props) {
         this.redis = redis;
-        this.timeoutMs = props.blacklist().redisTimeout();
+        this.timeout = props.blacklist().redisTimeout();
         this.degradeOnFailure = props.blacklist().degradeOnFailure();
     }
 
     @Override
     public Mono<Boolean> isBlacklisted(String jti, String userId, Instant tokenIssuedAt) {
         Mono<Boolean> jtiCheck = redis.hasKey(JTI_PREFIX + jti)
-                .timeout(Duration.ofMillis(timeoutMs));
+                .timeout(timeout);
 
         Mono<Boolean> userCheck = redis.opsForValue().get(USER_PREFIX + userId)
-                .timeout(Duration.ofMillis(timeoutMs))
+                .timeout(timeout)
                 .map(disabledAt -> {
                     long disabledEpoch = Long.parseLong(disabledAt);
                     return tokenIssuedAt.getEpochSecond() < disabledEpoch;

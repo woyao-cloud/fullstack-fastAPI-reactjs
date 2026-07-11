@@ -15,6 +15,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
+import java.time.Duration;
 
 import com.sun.management.OperatingSystemMXBean;
 
@@ -80,5 +81,5 @@ public class IngressCircuitBreakerFilter implements GlobalFilter {
 }
 
 @ConfigurationProperties("gateway.circuit-breaker.ingress")
-record IngressConfig(double cpuThreshold, double memoryThreshold, int sampleInterval,
+record IngressConfig(double cpuThreshold, double memoryThreshold, Duration sampleInterval,
                      int triggerCount, int recoverCount) {}

@@ -30,7 +30,7 @@ class RedisTokenBlacklistTest {
         when(ops.get(anyString())).thenReturn(Mono.empty());
 
         var authProps = new AuthProperties("secret", "HS256", List.of(),
-                new AuthProperties.Blacklist(2000, true));
+                new AuthProperties.Blacklist(Duration.ofMillis(2000), true));
         blacklist = new RedisTokenBlacklist(redis, authProps);
     }
 

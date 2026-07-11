@@ -2,6 +2,7 @@ package com.gateway.filter;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.time.Duration;
 import java.util.List;
 
 @ConfigurationProperties("gateway.auth")
@@ -11,5 +12,5 @@ public record AuthProperties(
     List<String> excludePaths,
     Blacklist blacklist
 ) {
-    public record Blacklist(long redisTimeout, boolean degradeOnFailure) {}
+    public record Blacklist(Duration redisTimeout, boolean degradeOnFailure) {}
 }
