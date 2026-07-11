@@ -1,6 +1,8 @@
 package com.product.domain.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.*;
 
@@ -39,8 +41,9 @@ public class Spu {
     @Column(name = "specs_template", nullable = false)
     private String specsTemplate = "[]";
 
-    @Column
-    private List<String> tags = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false)
+    private String tags = "[]";
 
     @OneToMany(mappedBy = "spu", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Sku> skus = new ArrayList<>();
@@ -80,8 +83,8 @@ public class Spu {
     public void setImages(String images) { this.images = images; }
     public String getSpecsTemplate() { return specsTemplate; }
     public void setSpecsTemplate(String specsTemplate) { this.specsTemplate = specsTemplate; }
-    public List<String> getTags() { return tags; }
-    public void setTags(List<String> tags) { this.tags = tags; }
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
     public List<Sku> getSkus() { return skus; }
     public void setSkus(List<Sku> skus) { this.skus = skus; }
     public Instant getCreatedAt() { return createdAt; }

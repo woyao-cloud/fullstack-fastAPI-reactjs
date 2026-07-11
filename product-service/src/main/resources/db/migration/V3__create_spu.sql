@@ -10,7 +10,7 @@ CREATE TABLE spu (
     cover_image     VARCHAR(255),
     images          JSONB NOT NULL DEFAULT '[]',
     specs_template  JSONB NOT NULL DEFAULT '[]',
-    tags            VARCHAR(100)[] DEFAULT '{}',
+    tags            JSONB NOT NULL DEFAULT '[]',
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
 );
