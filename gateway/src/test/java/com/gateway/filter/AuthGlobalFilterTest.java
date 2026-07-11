@@ -1,6 +1,5 @@
 package com.gateway.filter;
 
-import com.gateway.dto.UserInfo;
 import com.gateway.jwt.JwtException;
 import com.gateway.jwt.JwtParser;
 import com.gateway.jwt.TokenBlacklist;
@@ -74,7 +73,9 @@ class AuthGlobalFilterTest {
 
     @Test
     void shouldReturn401WhenBlacklisted() {
-        when(jwtParser.parse(anyString())).thenReturn(new UserInfo("user-1", "a@b.com", List.of()));
+        var userInfo = new com.gateway.dto.UserInfo("user-1", "a@b.com", List.of());
+        var parsed = new JwtParser.ParsedToken(userInfo, "jti-1", Instant.ofEpochSecond(1750000000));
+        when(jwtParser.parse(anyString())).thenReturn(parsed);
         when(blacklist.isBlacklisted(anyString(), anyString(), any(Instant.class)))
                 .thenReturn(Mono.just(true));
 

@@ -1,5 +1,0 @@
-# Created at 2026-07-11T11:38:51.571
-Boot Manifest-JAR contains absolute paths in classpath 'D:\claude-code-project\fullstack-fastAPI-reactjs\gateway\target\test-classes'
-Hint: <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
-'other' has different root
-

@@ -4,7 +4,6 @@ import com.gateway.dto.UserInfo;
 import com.gateway.jwt.JwtException;
 import com.gateway.jwt.JwtParser;
 import com.gateway.jwt.TokenBlacklist;
-import com.nimbusds.jwt.SignedJWT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -18,9 +17,7 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.text.ParseException;
 import java.time.Instant;
-import java.util.Date;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 3)
@@ -56,13 +53,10 @@ public class AuthGlobalFilter implements GlobalFilter {
         String token = authHeader.substring(BEARER_PREFIX.length());
 
         try {
-            UserInfo userInfo = jwtParser.parse(token);
-            SignedJWT jwt = SignedJWT.parse(token);
-            String jti = jwt.getJWTClaimsSet().getJWTID();
-            Date iat = jwt.getJWTClaimsSet().getIssueTime();
-            Instant issuedAt = iat != null ? iat.toInstant() : Instant.EPOCH;
+            JwtParser.ParsedToken parsed = jwtParser.parse(token);
+            UserInfo userInfo = parsed.userInfo();
 
-            return blacklist.isBlacklisted(jti, userInfo.userId(), issuedAt)
+            return blacklist.isBlacklisted(parsed.jti(), userInfo.userId(), parsed.issuedAt())
                     .flatMap(blacklisted -> {
                         if (blacklisted) {
                             return errorResponse(exchange, HttpStatus.UNAUTHORIZED, "认证凭据已失效");
@@ -72,9 +66,6 @@ public class AuthGlobalFilter implements GlobalFilter {
 
         } catch (JwtException e) {
             log.debug("JWT validation failed: {}", e.getMessage());
-            return errorResponse(exchange, HttpStatus.UNAUTHORIZED, "认证凭据无效或已过期");
-        } catch (ParseException e) {
-            log.error("Failed to parse JWT for blacklist check", e);
             return errorResponse(exchange, HttpStatus.UNAUTHORIZED, "认证凭据无效或已过期");
         }
     }

@@ -15,6 +15,8 @@ import java.util.List;
 @Component
 public class JwtParser {
 
+    public record ParsedToken(UserInfo userInfo, String jti, Instant issuedAt) {}
+
     private final JWSVerifier verifier;
     private final AuthProperties props;
 
@@ -27,7 +29,7 @@ public class JwtParser {
         }
     }
 
-    public UserInfo parse(String token) throws JwtException {
+    public ParsedToken parse(String token) throws JwtException {
         try {
             SignedJWT jwt = SignedJWT.parse(token);
             if (!jwt.verify(verifier)) {
@@ -43,7 +45,13 @@ public class JwtParser {
             }
             String email = jwt.getJWTClaimsSet().getStringClaim("email");
             List<String> permissions = jwt.getJWTClaimsSet().getStringListClaim("permissions");
-            return UserInfo.fromPayload(userId, email, permissions);
+            UserInfo userInfo = UserInfo.fromPayload(userId, email, permissions);
+
+            String jti = jwt.getJWTClaimsSet().getJWTID();
+            Date iat = jwt.getJWTClaimsSet().getIssueTime();
+            Instant issuedAt = iat != null ? iat.toInstant() : Instant.EPOCH;
+
+            return new ParsedToken(userInfo, jti, issuedAt);
         } catch (ParseException | com.nimbusds.jose.JOSEException e) {
             throw new JwtException("token 解析失败: " + e.getMessage(), e);
         }

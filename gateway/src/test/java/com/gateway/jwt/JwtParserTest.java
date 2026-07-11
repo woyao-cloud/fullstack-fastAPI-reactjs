@@ -1,6 +1,5 @@
 package com.gateway.jwt;
 
-import com.gateway.dto.UserInfo;
 import com.gateway.filter.AuthProperties;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -48,11 +47,13 @@ class JwtParserTest {
         String token = createToken("user-123", "test@example.com", List.of("user:read"),
                 Instant.now(), Instant.now().plusSeconds(3600));
 
-        UserInfo info = parser.parse(token);
+        JwtParser.ParsedToken parsed = parser.parse(token);
 
-        assertThat(info.userId()).isEqualTo("user-123");
-        assertThat(info.email()).isEqualTo("test@example.com");
-        assertThat(info.permissions()).contains("user:read");
+        assertThat(parsed.userInfo().userId()).isEqualTo("user-123");
+        assertThat(parsed.userInfo().email()).isEqualTo("test@example.com");
+        assertThat(parsed.userInfo().permissions()).contains("user:read");
+        assertThat(parsed.jti()).isNotNull();
+        assertThat(parsed.issuedAt()).isNotNull();
     }
 
     @Test

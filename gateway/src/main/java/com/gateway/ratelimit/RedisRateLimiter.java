@@ -75,8 +75,11 @@ public class RedisRateLimiter implements RateLimiter {
                 })
                 .defaultIfEmpty(RateLimitResult.allow(Long.MAX_VALUE))
                 .onErrorResume(e -> {
-                    log.warn("Rate limit Redis error, degraded: {}", e.getMessage());
-                    return Mono.just(RateLimitResult.allow(Long.MAX_VALUE));
+                    if (config.degradeOnFailure()) {
+                        log.warn("Rate limit Redis error, degraded: {}", e.getMessage());
+                        return Mono.just(RateLimitResult.allow(Long.MAX_VALUE));
+                    }
+                    return Mono.error(e);
                 });
     }
 

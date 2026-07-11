@@ -44,12 +44,18 @@ public class RedisTokenBlacklist implements TokenBlacklist {
         return Mono.zip(jtiCheck, userCheck)
                 .map(tuple -> tuple.getT1() || tuple.getT2())
                 .onErrorResume(RedisException.class, e -> {
-                    log.warn("Redis blacklist check failed, degraded: {}", e.getMessage());
-                    return Mono.just(false);
+                    if (degradeOnFailure) {
+                        log.warn("Redis blacklist check failed, degraded: {}", e.getMessage());
+                        return Mono.just(false);
+                    }
+                    return Mono.error(e);
                 })
                 .onErrorResume(e -> {
-                    log.warn("Blacklist check timeout, degraded: {}", e.getMessage());
-                    return Mono.just(false);
+                    if (degradeOnFailure) {
+                        log.warn("Blacklist check timeout, degraded: {}", e.getMessage());
+                        return Mono.just(false);
+                    }
+                    return Mono.error(e);
                 });
     }
 }
