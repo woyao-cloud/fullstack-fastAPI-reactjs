@@ -28,18 +28,18 @@ public class Spu {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private SpuStatus status = SpuStatus.DRAFT;
+    private SpuStatus status = SpuStatus.draft;
 
     @Column(name = "cover_image", length = 255)
     private String coverImage;
 
-    @Column(columnDefinition = "jsonb", nullable = false)
+    @Column(nullable = false)
     private String images = "[]";
 
-    @Column(name = "specs_template", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "specs_template", nullable = false)
     private String specsTemplate = "[]";
 
-    @Column(columnDefinition = "varchar(100)[]")
+    @Column
     private List<String> tags = new ArrayList<>();
 
     @OneToMany(mappedBy = "spu", cascade = CascadeType.ALL, orphanRemoval = true)

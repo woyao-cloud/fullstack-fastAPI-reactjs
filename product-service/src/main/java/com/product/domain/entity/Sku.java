@@ -17,7 +17,7 @@ public class Sku {
     @JoinColumn(name = "spu_id", nullable = false)
     private Spu spu;
 
-    @Column(columnDefinition = "jsonb", nullable = false)
+    @Column(nullable = false)
     private String specs = "{}";
 
     @Column(nullable = false, precision = 10, scale = 2)
@@ -38,7 +38,7 @@ public class Sku {
     @Column(precision = 10, scale = 3)
     private BigDecimal weight;
 
-    @Column(columnDefinition = "jsonb")
+    @Column
     private String images;
 
     @Column(name = "is_active", nullable = false)
