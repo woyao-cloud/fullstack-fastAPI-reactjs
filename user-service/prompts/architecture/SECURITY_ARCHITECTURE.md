@@ -105,7 +105,7 @@
      │ Bearer <token>   │                     │                   │
      │─────────────────▶│                     │                   │
      │                  │                     │                   │
-     │                  │ JwtAuthFilter       │                   │
+     │                  │ JWT 中间件/依赖    │                   │
      │                  │ ┌─────────────────┐ │                   │
      │                  │ │ 1. Extract Token│ │                   │
      │                  │ │ 2. Parse JWT    │ │                   │
@@ -115,7 +115,7 @@
      │                  │ │ 6. Set Context  │ │                   │
      │                  │ └─────────────────┘ │                   │
      │                  │                     │                   │
-     │                  │ @PreAuthorize       │                   │
+     │                  │ require_permission │                   │
      │                  │ check permissions   │                   │
      │                  │                     │                   │
      │                  │ getCurrentUser()    │                   │
@@ -250,75 +250,8 @@
 
 ### 3.3 方法级权限控制
 
-```java
-@RestController
-@RequestMapping("/api/v1/users")
-public class UserController {
-
-    // 需要 users:read 权限
-    @GetMapping
-    @PreAuthorize("hasAuthority('users:read')")
-    public Page<UserResponse> listUsers(Pageable pageable) {
-        // ...
-    }
-
-    // 需要 users:read 权限，或查询自己
-    @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('users:read') or @securityService.isCurrentUser(#id)")
-    public UserResponse getUser(@PathVariable UUID id) {
-        // ...
-    }
-
-    // 需要 users:create 权限
-    @PostMapping
-    @PreAuthorize("hasAuthority('users:create')")
-    public ResponseEntity<UserResponse> createUser(
-            @Valid @RequestBody UserCreateRequest request) {
-        // ...
-    }
-
-    // 需要 users:update 权限，或更新自己
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('users:update') or @securityService.isCurrentUser(#id)")
-    public UserResponse updateUser(
-            @PathVariable UUID id,
-            @Valid @RequestBody UserUpdateRequest request) {
-        // ...
-    }
-
-    // 需要 users:delete 权限
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('users:delete')")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteUser(@PathVariable UUID id) {
-        // ...
-    }
-}
-```
 
 ### 3.4 权限评估器
-
-```java
-@Component("securityService")
-public class SecurityService {
-
-    private final UserRepository userRepository;
-
-    public boolean isCurrentUser(UUID userId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            return false;
-        }
-
-        String currentUserId = auth.getName();
-        return currentUserId.equals(userId.toString());
-    }
-
-    public boolean hasPermission(String resource, String action) {
-        // 自定义权限检查逻辑
-    }
-}
-```
 
 ---
 
@@ -326,17 +259,6 @@ public class SecurityService {
 
 ### 4.1 密码安全
 
-```java
-@Configuration
-public class SecurityConfig {
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        // 强度因子 12 (2^12 iterations)
-        return new BCryptPasswordEncoder(12);
-    }
-}
-```
 
 **密码策略**:
 - 最小长度: 8 字符
@@ -374,44 +296,6 @@ public class SecurityConfig {
 
 ### 4.3 速率限制
 
-```java
-@Component
-public class RateLimitFilter extends OncePerRequestFilter {
-
-    private final LoadingCache<String, Bucket> buckets;
-
-    public RateLimitFilter() {
-        this.buckets = Caffeine.newBuilder()
-            .expireAfterAccess(1, TimeUnit.HOURS)
-            .build(this::createNewBucket);
-    }
-
-    private Bucket createNewBucket(String key) {
-        // 每小时 100 次请求
-        Bandwidth limit = Bandwidth.classic(100, Refill.intervally(100, Duration.ofHours(1)));
-        return Bucket.builder()
-            .addLimit(limit)
-            .build();
-    }
-
-    @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
-        String clientIp = getClientIp(request);
-        Bucket bucket = buckets.get(clientIp);
-
-        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-        if (probe.isConsumed()) {
-            response.addHeader("X-Rate-Limit-Remaining", String.valueOf(probe.getRemainingTokens()));
-            filterChain.doFilter(request, response);
-        } else {
-            response.setStatus(429);
-            response.getWriter().write("{\"error\":\"Rate limit exceeded\"}");
-        }
-    }
-}
-```
 
 **速率限制规则**:
 
@@ -425,46 +309,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
 ### 4.4 输入验证
 
-```java
-public record UserCreateRequest(
-    @NotBlank(message = "用户名不能为空")
-    @Size(min = 3, max = 50, message = "用户名长度必须在 3-50 字符之间")
-    @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "用户名只能包含字母、数字和下划线")
-    String username,
-
-    @NotBlank(message = "邮箱不能为空")
-    @Email(message = "邮箱格式不正确")
-    @Size(max = 255, message = "邮箱长度不能超过 255 字符")
-    String email,
-
-    @NotBlank(message = "密码不能为空")
-    @Size(min = 8, max = 100, message = "密码长度必须在 8-100 字符之间")
-    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
-             message = "密码必须包含至少一个大写字母、一个小写字母和一个数字")
-    String password,
-
-    @Size(max = 100, message = "名字长度不能超过 100 字符")
-    String firstName,
-
-    @Size(max = 100, message = "姓氏长度不能超过 100 字符")
-    String lastName
-) {}
-```
 
 ### 4.5 SQL 注入防护
 
-- 使用 **JPA/Hibernate** (参数化查询)
+- 使用 **SQLAlchemy** (参数化查询)
 - 禁止使用字符串拼接 SQL
-- 启用 Hibernate 的 SQL 日志审计
+- 启用 SQLAlchemy 的 SQL 日志审计
 
-```java
-// 安全示例 (使用参数化查询)
-@Query("SELECT u FROM User u WHERE u.email = :email")
-Optional<User> findByEmail(@Param("email") String email);
-
-// 危险示例 (不要这样做)
-// @Query("SELECT * FROM users WHERE email = '" + email + "'")
-```
 
 ### 4.6 XSS 防护
 
@@ -472,25 +323,6 @@ Optional<User> findByEmail(@Param("email") String email);
 - 后端使用 DTO，不直接暴露实体
 - 响应头配置:
 
-```java
-@Configuration
-public class SecurityHeadersConfig {
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .headers(headers -> headers
-                .contentSecurityPolicy(csp ->
-                    csp.policyDirectives("default-src 'self'"))
-                .xssProtection(xss ->
-                    xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
-                .frameOptions(frame ->
-                    frame.sameOrigin())
-            );
-        return http.build();
-    }
-}
-```
 
 ### 4.7 CSRF 防护
 
@@ -499,12 +331,6 @@ public class SecurityHeadersConfig {
 - 不使用 Cookie-based Session
 
 如果必须使用 Cookie:
-```java
-http
-    .csrf(csrf -> csrf
-        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-    );
-```
 
 ---
 
@@ -512,27 +338,7 @@ http
 
 ### 5.1 传输层安全
 
-```yaml
-# application-prod.yml
-server:
-  ssl:
-    enabled: true
-    protocol: TLS
-    enabled-protocols: TLSv1.2,TLSv1.3
-    cipher-suites: TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256
-    certificate: classpath:ssl/server.crt
-    certificate-private-key: classpath:ssl/server.key
-```
-
 **HSTS 配置**:
-```java
-http.headers(headers ->
-    headers.httpStrictTransportSecurity(hsts ->
-        hsts.includeSubDomains(true)
-            .maxAgeInSeconds(31536000)  // 1 year
-    )
-);
-```
 
 ### 5.2 敏感数据存储
 
@@ -545,27 +351,6 @@ http.headers(headers ->
 
 ### 5.3 日志脱敏
 
-```java
-@Component
-public class SensitiveDataMasker {
-
-    private static final Pattern EMAIL_PATTERN =
-        Pattern.compile("([a-zA-Z0-9._%+-]{2})[a-zA-Z0-9._%+-]*@([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})");
-
-    public String maskEmail(String email) {
-        if (email == null) return null;
-        Matcher matcher = EMAIL_PATTERN.matcher(email);
-        if (matcher.find()) {
-            return matcher.group(1) + "***@" + matcher.group(2);
-        }
-        return "***";
-    }
-
-    public String maskPassword(String password) {
-        return "[REDACTED]";
-    }
-}
-```
 
 ---
 
@@ -573,35 +358,6 @@ public class SensitiveDataMasker {
 
 ### 6.1 审计日志
 
-```java
-@Aspect
-@Component
-public class AuditLogAspect {
-
-    @Around("@annotation(Auditable)")
-    public Object logAudit(ProceedingJoinPoint joinPoint) throws Throwable {
-        // 记录操作前状态
-        AuditLogEntry entry = new AuditLogEntry();
-        entry.setTimestamp(Instant.now());
-        entry.setUser(getCurrentUser());
-        entry.setAction(joinPoint.getSignature().getName());
-        entry.setIpAddress(getClientIp());
-        entry.setUserAgent(getUserAgent());
-
-        try {
-            Object result = joinPoint.proceed();
-            entry.setStatus("SUCCESS");
-            return result;
-        } catch (Exception e) {
-            entry.setStatus("FAILURE");
-            entry.setErrorMessage(e.getMessage());
-            throw e;
-        } finally {
-            auditLogRepository.save(entry);
-        }
-    }
-}
-```
 
 **审计事件**:
 - 用户登录/登出
@@ -639,18 +395,12 @@ public class AuditLogAspect {
 
 ### 7.2 依赖安全扫描
 
-```bash
-# OWASP Dependency Check
-./mvnw org.owasp:dependency-check-maven:check
 
-# Snyk 扫描
-snyk test
 
 # GitHub Dependabot
 # 自动 PR 更新有漏洞的依赖
-```
 
----
+
 
 ## 8. 应急响应
 

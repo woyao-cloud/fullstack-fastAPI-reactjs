@@ -197,27 +197,6 @@ CREATE TABLE system_config (
 
 #### 4.2.2 部门数据权限实现
 
-```java
-@Component
-public class DepartmentDataPermissionFilter {
-
-    @Autowired
-    private DepartmentService departmentService;
-
-    public Specification<User> filterByDepartment(UUID userDepartmentId) {
-        return (root, query, cb) -> {
-            // 获取用户部门的所有子部门ID
-            List<UUID> accessibleDeptIds = departmentService
-                .getSubDepartmentIds(userDepartmentId);
-
-            // 添加用户自己的部门
-            accessibleDeptIds.add(userDepartmentId);
-
-            return root.get("departmentId").in(accessibleDeptIds);
-        };
-    }
-}
-```
 
 ### 4.3 性能优化增强
 
@@ -225,32 +204,14 @@ public class DepartmentDataPermissionFilter {
 
 | 优化点 | 具体措施 | 预期效果 |
 |--------|----------|----------|
-| **连接池优化** | HikariCP: max=50, min=10 | 减少连接创建开销 |
+| **连接池优化** | SQLAlchemy async + asyncpg: pool size=50 | 减少连接创建开销 |
 | **Redis Pipeline** | 批量操作登录计数和会话 | 减少网络往返 |
 | **JWT预生成** | 启动时加载RSA密钥 | 避免重复密钥加载 |
-| **异步日志** | Kafka + 线程池 | 登录响应时间减少30% |
+| **异步日志** | aiokafka + asyncio 任务 | 登录响应时间减少30% |
 | **缓存预热** | 热点用户权限预加载 | 权限检查时间减少80% |
 
 #### 4.3.2 部门树查询优化
 
-```java
-@Service
-public class DepartmentTreeCacheService {
-
-    @Cacheable(value = "departmentTree", key = "'fullTree'")
-    public DepartmentTreeDTO getFullTree() {
-        // 从数据库查询并构建树形结构
-        return buildTreeFromDatabase();
-    }
-
-    @Cacheable(value = "departmentSubtree", key = "#rootId")
-    public List<DepartmentDTO> getSubtree(UUID rootId) {
-        // 使用path字段快速查询子树
-        String path = departmentRepository.findPathById(rootId);
-        return departmentRepository.findByPathStartingWith(path + "/");
-    }
-}
-```
 
 ### 4.4 安全架构增强
 
@@ -262,18 +223,6 @@ public class DepartmentTreeCacheService {
 3. **网络安全**：HTTPS强制，CSRF防护，接口限流
 
 **实现方式**：
-```java
-@Configuration
-@ConfigurationProperties(prefix = "security.policy")
-public class SecurityPolicyConfig {
-
-    private PasswordPolicy passwordPolicy;
-    private LoginPolicy loginPolicy;
-    private NetworkPolicy networkPolicy;
-
-    // 动态应用到Spring Security配置
-}
-```
 
 #### 4.4.2 会话管理安全
 
@@ -298,13 +247,13 @@ public class SecurityPolicyConfig {
 | ADR-010 | 系统配置管理设计 | 数据库存储 vs 配置文件 vs 配置中心 |
 | ADR-011 | 角色继承机制设计 | 多继承 vs 单继承，权限合并算法 |
 | ADR-012 | 文件存储方案 | 本地存储 vs 对象存储（MinIO/S3） |
-| ADR-013 | 邮件服务集成 | Spring Mail vs 第三方邮件服务API |
+| ADR-013 | 邮件服务集成 | aiosmtplib vs 第三方邮件服务API |
 
 ### 5.2 需要更新的现有ADR
 
 | ADR编号 | 需要更新的内容 |
 |---------|----------------|
-| ADR-003 | 增加部门树查询的JPA优化策略 |
+| ADR-003 | 增加部门树查询的 SQLAlchemy 优化策略 |
 | ADR-005 | 增加数据权限缓存的特殊处理 |
 | ADR-007 | 增加部门管理相关的测试策略 |
 

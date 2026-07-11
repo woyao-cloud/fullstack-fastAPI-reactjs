@@ -716,7 +716,7 @@ jobs:
     - name: Start Backend
       run: |
         cd backend
-        ./mvnw spring-boot:run &
+        uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 &
         BACKEND_PID=$!
         sleep 60
 

@@ -1,0 +1,87 @@
+# ============================================================
+# Docker Compose — 本地全栈开发环境
+# ============================================================
+# 使用: docker compose up -d
+# 访问: http://localhost:3000
+
+services:
+  # --- 数据库 ---
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: user_service
+      POSTGRES_USER: user_service
+      POSTGRES_PASSWORD: change-me-in-production
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- 缓存 ---
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- 消息队列 ---
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      kafka-zookeeper:
+        condition: service_started
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: kafka-zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+  kafka-zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  # --- 后端 ---
+  backend:
+    build:
+      context: ./back-end
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user_service:change-me-in-production@postgres:5432/user_service
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET_KEY: change-me-in-production
+      CONFIG_ENCRYPTION_KEY: change-me-in-production-must-be-32-chars-long
+      CACHE_ENABLED: "true"
+      CONFIG_CACHE_ENABLED: "true"
+    ports:
+      - "8000:8000"
+
+  # --- 前端 ---
+  frontend:
+    build:
+      context: ./front-end
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_BASE: /api/v1
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

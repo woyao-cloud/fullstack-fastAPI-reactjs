@@ -97,25 +97,21 @@
 ### 5.1 数据模型
 
 #### 5.1.1 实体定义
-```java
-@Entity
-@Table(name = "[table_name]")
-public class [EntityName] {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+```python
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.domain.models.base import Base
 
-    // 字段定义
-    @Column(name = "field_name", nullable = false, length = 100)
-    private String fieldName;
+class EntityName(Base):
+    __tablename__ = "[table_name]"
 
-    // 关联关系
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "related_id")
-    private RelatedEntity related;
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    // 构造函数、getter/setter等
-}
+    # 字段定义
+    field_name: Mapped[str] = mapped_column("field_name", nullable=False, length=100)
+
+    # 关联关系
+    related_id: Mapped[int | None] = mapped_column(ForeignKey("related.id"))
+    related: Mapped["RelatedEntity"] = relationship(lazy="selectin")
 ```
 
 #### 5.1.2 数据库表结构
@@ -192,39 +188,32 @@ public class [EntityName] {
 ### 5.3 业务逻辑设计
 
 #### 5.3.1 服务层设计
-```java
-@Service
-@Transactional
-@Slf4j
-public class [ServiceName] {
+```python
+import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 
-    private final [RepositoryName] repository;
-    private final [OtherService] otherService;
+logger = logging.getLogger(__name__)
 
-    public [ServiceName]([RepositoryName] repository, [OtherService] otherService) {
-        this.repository = repository;
-        this.otherService = otherService;
-    }
+class ServiceName:
 
-    /**
-     * 业务方法示例
-     */
-    public ResultType businessMethod(ParamType param) {
-        // 1. 参数验证
-        validateParam(param);
+    def __init__(self, repository: RepositoryName, other_service: OtherService):
+        self.repository = repository
+        self.other_service = other_service
 
-        // 2. 业务逻辑处理
-        BusinessEntity entity = processBusinessLogic(param);
+    async def business_method(self, param: ParamType, db: AsyncSession) -> ResultType:
+        """业务方法示例"""
+        # 1. 参数验证
+        self._validate_param(param)
 
-        // 3. 数据持久化
-        repository.save(entity);
+        # 2. 业务逻辑处理
+        entity = await self._process_business_logic(param)
 
-        // 4. 返回结果
-        return buildResult(entity);
-    }
+        # 3. 数据持久化（事务）
+        async with db.begin():
+            await self.repository.save(db, entity)
 
-    // 私有方法定义
-}
+        # 4. 返回结果
+        return self._build_result(entity)
 ```
 
 #### 5.3.2 关键算法
@@ -252,8 +241,8 @@ public class [ServiceName] {
 ### 6.1 测试类型
 | 测试类型 | 覆盖率要求 | 测试工具 | 说明 |
 |----------|------------|----------|------|
-| 单元测试 | > 85% | JUnit 5, Mockito | 测试单个方法或类 |
-| 集成测试 | > 70% | Spring Boot Test | 测试模块间集成 |
+| 单元测试 | > 85% |  测试单个方法或类 |
+| 集成测试 | > 70% |  测试模块间集成 |
 | API测试 | 100% | REST Assured | 测试所有API端点 |
 | E2E测试 | 关键流程 | Playwright | 测试完整用户流程 |
 
@@ -286,8 +275,8 @@ public class [ServiceName] {
 
 ### 7.3 部署步骤
 1. **环境准备**: 配置服务器、安装依赖
-2. **数据库初始化**: 执行Flyway迁移脚本
-3. **应用部署**: 部署Spring Boot应用
+2. **数据库初始化**: 执行Alembic迁移脚本
+3. **应用部署**: 部署FastAPI应用
 4. **前端部署**: 部署Next.js应用
 5. **配置验证**: 验证各项配置
 6. **健康检查**: 检查服务健康状态
