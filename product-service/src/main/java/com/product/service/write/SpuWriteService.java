@@ -1,8 +1,12 @@
 package com.product.service.write;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.product.domain.entity.*;
 import com.product.dto.request.SkuRequest;
 import com.product.dto.request.SpuCreateRequest;
+import com.product.dto.response.BrandResponse;
+import com.product.dto.response.CategoryResponse;
 import com.product.dto.response.SkuResponse;
 import com.product.dto.response.SpuResponse;
 import com.product.repository.BrandRepository;
@@ -24,13 +28,16 @@ public class SpuWriteService {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final SkuRepository skuRepository;
+    private final ObjectMapper objectMapper;
 
     public SpuWriteService(SpuRepository spuRepository, CategoryRepository categoryRepository,
-                           BrandRepository brandRepository, SkuRepository skuRepository) {
+                           BrandRepository brandRepository, SkuRepository skuRepository,
+                           ObjectMapper objectMapper) {
         this.spuRepository = spuRepository;
         this.categoryRepository = categoryRepository;
         this.brandRepository = brandRepository;
         this.skuRepository = skuRepository;
+        this.objectMapper = objectMapper;
     }
 
     public SpuResponse create(SpuCreateRequest request) {
@@ -75,10 +82,12 @@ public class SpuWriteService {
         if (r.brandId() != null) {
             spu.setBrand(brandRepository.findById(r.brandId())
                     .orElseThrow(() -> new IllegalArgumentException("品牌不存在: " + r.brandId())));
+        } else {
+            spu.setBrand(null);
         }
         spu.setCoverImage(r.coverImage());
         spu.setImages(toJsonArray(r.images()));
-        spu.setSpecsTemplate(toJsonArray(r.specsTemplate() == null ? List.of() : r.specsTemplate().stream().map(s -> "{\"key\":\"" + s.key() + "\",\"values\":" + s.values() + "}").toList()));
+        spu.setSpecsTemplate(toJsonArray(r.specsTemplate()));
         spu.setTags(toJsonArray(r.tags()));
     }
 
@@ -96,25 +105,76 @@ public class SpuWriteService {
     }
 
     private String toJson(Object o) {
-        // 用 Jackson ObjectMapper 序列化；SPU 的 images/specsTemplate/tags 为 JSON 字符串列
-        return com.fasterxml.jackson.databind.json.JsonMapper.builder().build().valueToTree(o).toString();
+        // 用注入的 ObjectMapper 序列化；SPU 的 images/specsTemplate/tags 与 SKU 的 specs/images 为 JSON 字符串列
+        return objectMapper.valueToTree(o).toString();
     }
 
-    private String toJsonArray(List<String> list) {
+    private String toJsonArray(List<?> list) {
         return list == null ? "[]" : toJson(list);
     }
 
     private SpuResponse toResponse(Spu spu) {
         return new SpuResponse(
                 spu.getId(), spu.getName(), spu.getDescription(),
-                null, null, spu.getStatus().name(), spu.getCoverImage(),
-                List.of(), List.of(), List.of(),
+                toCategoryResponse(spu.getCategory()),
+                spu.getBrand() != null ? toBrandResponse(spu.getBrand()) : null,
+                spu.getStatus().name(), spu.getCoverImage(),
+                readList(spu.getImages(), new TypeReference<List<String>>() {}),
+                readList(spu.getSpecsTemplate(), new TypeReference<List<SpuResponse.SpecTemplateResponse>>() {}),
+                readList(spu.getTags(), new TypeReference<List<String>>() {}),
                 spu.getSkus().stream().map(this::toSkuResponse).toList());
     }
 
     private SkuResponse toSkuResponse(Sku sku) {
-        return new SkuResponse(sku.getId(), sku.getSpecs() == null ? Map.of() : Map.of(),
+        return new SkuResponse(sku.getId(),
+                readMap(sku.getSpecs()),
                 sku.getPrice(), sku.getSkuCode(), sku.getBarCode(), sku.getWeight(),
-                List.of(), sku.isActive(), 0);
+                readList(sku.getImages(), new TypeReference<List<String>>() {}),
+                sku.isActive(), 0);
+    }
+
+    private CategoryResponse toCategoryResponse(Category category) {
+        return new CategoryResponse(
+                category.getId(),
+                category.getName(),
+                category.getSlug(),
+                category.getParent() != null ? category.getParent().getId() : null,
+                category.getSortOrder(),
+                category.getIcon(),
+                category.isActive(),
+                List.of()
+        );
+    }
+
+    private BrandResponse toBrandResponse(Brand brand) {
+        return new BrandResponse(
+                brand.getId(),
+                brand.getName(),
+                brand.getLogoUrl(),
+                brand.getDescription(),
+                brand.getSortOrder()
+        );
+    }
+
+    private Map<String, String> readMap(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, String>>() {});
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
+    private <T> List<T> readList(String json, TypeReference<List<T>> typeRef) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, typeRef);
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 }
