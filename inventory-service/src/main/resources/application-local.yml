@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/inventory_service
+    username: inventory
+    password: inventory123
+  kafka: { bootstrap-servers: localhost:9092 }
+logging: { level: { com.inventory: DEBUG } }
