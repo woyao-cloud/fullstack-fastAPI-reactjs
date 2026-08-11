@@ -1,6 +1,6 @@
 services:
   postgres-product:
-    image: postgres:16
+    image: postgres:17
     container_name: postgres-product
     ports: ["5433:5432"]
     environment:
@@ -13,7 +13,7 @@ services:
       timeout: 3s
       retries: 10
   postgres-inventory:
-    image: postgres:16
+    image: postgres:17
     container_name: postgres-inventory
     ports: ["5434:5432"]
     environment:
@@ -26,7 +26,7 @@ services:
       timeout: 3s
       retries: 10
   postgres-order:
-    image: postgres:16
+    image: postgres:17
     container_name: postgres-order
     ports: ["5435:5432"]
     environment:
@@ -39,25 +39,31 @@ services:
       timeout: 3s
       retries: 10
   kafka:
-    image: bitnami/kafka:3.7
+    image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
     ports: ["9092:9092"]
+    # confluentinc/cp-kafka 使用 KAFKA_* 环境变量（非 bitnami 的 KAFKA_CFG_*）；KRaft 单节点
     environment:
-      KAFKA_CFG_NODE_ID: 0
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_NODE_ID: 0
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
   redis:
-    image: redis:7
+    image: redis:latest
     container_name: redis
     ports: ["6379:6379"]
   product-service:
     build: ./product-service
     container_name: product-service
-    ports: ["8081:8081"]
+    # 仅回环绑定，避免未鉴权 internal 端点暴露到局域网
+    ports: ["127.0.0.1:8081:8081"]
     depends_on:
       postgres-product:
         condition: service_healthy
@@ -73,7 +79,8 @@ services:
   inventory-service:
     build: ./inventory-service
     container_name: inventory-service
-    ports: ["8082:8082"]
+    # 仅回环绑定，避免未鉴权 internal 端点暴露到局域网
+    ports: ["127.0.0.1:8082:8082"]
     depends_on:
       postgres-inventory:
         condition: service_healthy
@@ -87,7 +94,8 @@ services:
   order-service:
     build: ./order-service
     container_name: order-service
-    ports: ["8083:8083"]
+    # 仅回环绑定，避免未鉴权 internal 端点暴露到局域网
+    ports: ["127.0.0.1:8083:8083"]
     depends_on:
       postgres-order:
         condition: service_healthy
