@@ -6,10 +6,13 @@ import com.order.client.SkuSnapshot;
 import com.order.domain.entity.Order;
 import com.order.domain.entity.OrderItem;
 import com.order.domain.entity.OrderStatus;
+import com.order.domain.entity.Payment;
+import com.order.event.OrderEvent;
 import com.order.event.OrderEventPublisher;
 import com.order.repository.CartRepository;
 import com.order.repository.OrderItemRepository;
 import com.order.repository.OrderRepository;
+import com.order.repository.PaymentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,16 +30,19 @@ public class OrderService {
     private final InventoryClient inventoryClient;
     private final ProductClient productClient;
     private final OrderEventPublisher publisher;
+    private final PaymentRepository paymentRepository;
 
     public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
                         CartRepository cartRepository, InventoryClient inventoryClient,
-                        ProductClient productClient, OrderEventPublisher publisher) {
+                        ProductClient productClient, OrderEventPublisher publisher,
+                        PaymentRepository paymentRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
         this.inventoryClient = inventoryClient;
         this.productClient = productClient;
         this.publisher = publisher;
+        this.paymentRepository = paymentRepository;
     }
 
     public OrderResponse createOrder(UUID userId, CreateOrderRequest req) {
@@ -83,6 +89,52 @@ public class OrderService {
     private static OrderResponse toResponse(Order order) {
         return new OrderResponse(order.getId(), order.getOrderNo(), order.getStatus(),
                 order.getTotalAmount(), order.getPaidAt(), order.getClosedAt());
+    }
+
+    public void pay(UUID orderId, UUID userId) {
+        Order order = requireOrder(orderId, userId);
+        requireStatus(order, OrderStatus.PENDING_PAYMENT);
+        order.setStatus(OrderStatus.PAID);
+        order.setPaidAt(java.time.Instant.now());
+        Payment payment = new Payment();
+        payment.setPayNo("PAY" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
+        payment.setOrderId(orderId);
+        payment.setAmount(order.getPayAmount());
+        payment.setStatus("SUCCESS");
+        payment.setChannel("MOCK");
+        payment.setPaidAt(order.getPaidAt());
+        paymentRepository.save(payment);
+        publisher.publish(OrderEvent.EventType.PAID, orderId, order.getOrderNo(), itemsOf(orderId));
+    }
+
+    public void refund(UUID orderId, UUID userId) {
+        Order order = requireOrder(orderId, userId);
+        requireStatus(order, OrderStatus.PAID);   // 仅已支付可退
+        order.setStatus(OrderStatus.REFUNDING);
+        order.setStatus(OrderStatus.REFUNDED);    // 模拟立即退款成功
+        publisher.publish(OrderEvent.EventType.REFUNDED, orderId, order.getOrderNo(), itemsOf(orderId));
+    }
+
+    public void ship(UUID orderId, UUID userId) {
+        Order order = requireOrder(orderId, userId);
+        requireStatus(order, OrderStatus.PAID);
+        order.setStatus(OrderStatus.SHIPPED);
+    }
+
+    private Order requireOrder(UUID orderId, UUID userId) {
+        return orderRepository.findByIdAndUserId(orderId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("订单不存在: " + orderId));
+    }
+
+    private void requireStatus(Order order, OrderStatus expected) {
+        if (order.getStatus() != expected) {
+            throw new IllegalStateException("订单状态不允许该操作: " + order.getStatus());
+        }
+    }
+
+    private List<OrderEvent.Item> itemsOf(UUID orderId) {
+        return orderItemRepository.findByOrderId(orderId).stream()
+                .map(i -> new OrderEvent.Item(i.getSkuId(), i.getQuantity())).toList();
     }
 
     public record CreateOrderRequest(List<OrderLine> lines) {}

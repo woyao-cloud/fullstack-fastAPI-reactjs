@@ -11,6 +11,7 @@ import com.order.event.OrderEventPublisher;
 import com.order.repository.CartRepository;
 import com.order.repository.OrderItemRepository;
 import com.order.repository.OrderRepository;
+import com.order.repository.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,12 +36,13 @@ class OrderServiceTest {
     @Mock InventoryClient inventoryClient;
     @Mock ProductClient productClient;
     @Mock OrderEventPublisher publisher;
+    @Mock PaymentRepository paymentRepository;
     OrderService service;
 
     @BeforeEach
     void setUp() {
         service = new OrderService(orderRepository, orderItemRepository, cartRepository,
-                inventoryClient, productClient, publisher);
+                inventoryClient, productClient, publisher, paymentRepository);
     }
 
     @Test
