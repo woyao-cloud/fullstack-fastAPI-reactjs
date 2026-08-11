@@ -13,6 +13,7 @@ import com.order.repository.CartRepository;
 import com.order.repository.OrderItemRepository;
 import com.order.repository.OrderRepository;
 import com.order.repository.PaymentRepository;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -113,6 +114,25 @@ public class OrderService {
         order.setStatus(OrderStatus.REFUNDING);
         order.setStatus(OrderStatus.REFUNDED);    // 模拟立即退款成功
         publisher.publish(OrderEvent.EventType.REFUNDED, orderId, order.getOrderNo(), itemsOf(orderId));
+    }
+
+    @Scheduled(fixedDelay = 60000)   // 每分钟扫一次
+    public void closeTimeoutOrders() {
+        List<Order> expired = orderRepository.findByStatusAndCreatedAtBefore(
+                OrderStatus.PENDING_PAYMENT, java.time.Instant.now().minus(java.time.Duration.ofMinutes(15)));
+        for (Order order : expired) {
+            order.setStatus(OrderStatus.CLOSED);
+            order.setClosedAt(java.time.Instant.now());
+            publisher.publish(OrderEvent.EventType.CLOSED, order.getId(), order.getOrderNo(), itemsOf(order.getId()));
+        }
+    }
+
+    public void cancel(UUID orderId, UUID userId) {
+        Order order = requireOrder(orderId, userId);
+        requireStatus(order, OrderStatus.PENDING_PAYMENT);
+        order.setStatus(OrderStatus.CLOSED);
+        order.setClosedAt(java.time.Instant.now());
+        publisher.publish(OrderEvent.EventType.CANCELLED, orderId, order.getOrderNo(), itemsOf(orderId));
     }
 
     public void ship(UUID orderId, UUID userId) {
