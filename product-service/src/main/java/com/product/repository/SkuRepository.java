@@ -16,4 +16,6 @@ public interface SkuRepository extends JpaRepository<Sku, UUID> {
     boolean existsBySkuCode(String skuCode);
 
     Optional<Sku> findByBarCode(String barCode);
+
+    void deleteBySpuId(UUID spuId);
 }
