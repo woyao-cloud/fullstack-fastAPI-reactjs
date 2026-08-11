@@ -6,6 +6,8 @@ import com.product.domain.entity.Sku;
 import com.product.domain.entity.Spu;
 import com.product.domain.entity.SpuStatus;
 import com.product.dto.request.ProductSearchRequest;
+import com.product.dto.response.SkuSnapshot;
+import com.product.repository.SkuRepository;
 import com.product.repository.SpuRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,10 +32,11 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ProductQueryServiceTest {
     @Mock SpuRepository spuRepository;
+    @Mock SkuRepository skuRepository;
     ProductQueryService service;
 
     @BeforeEach
-    void setUp() { service = new ProductQueryService(spuRepository, new ObjectMapper()); }
+    void setUp() { service = new ProductQueryService(spuRepository, skuRepository, new ObjectMapper()); }
 
     @Test
     void shouldSearchByName() {
@@ -82,6 +85,19 @@ class ProductQueryServiceTest {
         assertThatThrownBy(() -> service.detail(UUID.randomUUID()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("商品不存在");
+    }
+
+    @Test
+    void shouldBatchSkus() {
+        UUID skuId = UUID.randomUUID();
+        Spu spu = new Spu(); spu.setName("iPhone");
+        Sku sku = new Sku(); sku.setId(skuId); sku.setSpu(spu); sku.setSpecs("黑"); sku.setPrice(new BigDecimal("5999.00"));
+        when(skuRepository.findByIdsWithSpu(List.of(skuId))).thenReturn(List.of(sku));
+
+        var result = service.batchSkus(List.of(skuId));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isEqualTo(new SkuSnapshot(skuId, "iPhone", "黑", new BigDecimal("5999.00")));
     }
 
     private Spu newActiveSpu() {

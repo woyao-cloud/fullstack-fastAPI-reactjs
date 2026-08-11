@@ -12,7 +12,9 @@ import com.product.dto.response.BrandResponse;
 import com.product.dto.response.CategoryResponse;
 import com.product.dto.response.PageResponse;
 import com.product.dto.response.SkuResponse;
+import com.product.dto.response.SkuSnapshot;
 import com.product.dto.response.SpuResponse;
+import com.product.repository.SkuRepository;
 import com.product.repository.SpuRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.cache.annotation.Cacheable;
@@ -32,11 +34,19 @@ import java.util.UUID;
 public class ProductQueryService {
 
     private final SpuRepository spuRepository;
+    private final SkuRepository skuRepository;
     private final ObjectMapper objectMapper;
 
-    public ProductQueryService(SpuRepository spuRepository, ObjectMapper objectMapper) {
+    public ProductQueryService(SpuRepository spuRepository, SkuRepository skuRepository, ObjectMapper objectMapper) {
         this.spuRepository = spuRepository;
+        this.skuRepository = skuRepository;
         this.objectMapper = objectMapper;
+    }
+
+    public List<SkuSnapshot> batchSkus(List<UUID> skuIds) {
+        return skuRepository.findByIdsWithSpu(skuIds).stream()
+                .map(s -> new SkuSnapshot(s.getId(), s.getSpu().getName(), s.getSpecs(), s.getPrice()))
+                .toList();
     }
 
     @Cacheable(cacheNames = "product:detail", key = "#id")
