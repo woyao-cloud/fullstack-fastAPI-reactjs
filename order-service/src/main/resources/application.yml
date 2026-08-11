@@ -22,3 +22,7 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 management: { endpoints: { web: { exposure: { include: health,metrics } } } }
+inventory:
+  service: { url: ${INVENTORY_SERVICE_URL:http://localhost:8082} }
+product:
+  service: { url: ${PRODUCT_SERVICE_URL:http://localhost:8081} }
