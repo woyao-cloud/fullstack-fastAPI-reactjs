@@ -75,4 +75,21 @@ class OrderServiceTest {
 
         assertThat(result.status()).isEqualTo(OrderStatus.CLOSED);
     }
+
+    @Test
+    void shouldGetOrderByUser() {
+        UUID userId = UUID.randomUUID(), orderId = UUID.randomUUID();
+        Order order = new Order();
+        order.setId(orderId);
+        order.setOrderNo("NO123");
+        order.setUserId(userId);
+        order.setStatus(OrderStatus.PAID);
+        order.setTotalAmount(new BigDecimal("99.00"));
+        when(orderRepository.findByIdAndUserId(orderId, userId)).thenReturn(java.util.Optional.of(order));
+
+        OrderResponse resp = service.getOrder(orderId, userId);
+
+        assertThat(resp.id()).isEqualTo(orderId);
+        assertThat(resp.status()).isEqualTo(OrderStatus.PAID);
+    }
 }

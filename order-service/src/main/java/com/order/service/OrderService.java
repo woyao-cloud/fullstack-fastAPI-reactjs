@@ -87,6 +87,11 @@ public class OrderService {
         return toResponse(saved);
     }
 
+    public OrderResponse getOrder(UUID orderId, UUID userId) {
+        return orderRepository.findByIdAndUserId(orderId, userId).map(OrderService::toResponse)
+                .orElseThrow(() -> new IllegalArgumentException("订单不存在: " + orderId));
+    }
+
     private static OrderResponse toResponse(Order order) {
         return new OrderResponse(order.getId(), order.getOrderNo(), order.getStatus(),
                 order.getTotalAmount(), order.getPaidAt(), order.getClosedAt());
