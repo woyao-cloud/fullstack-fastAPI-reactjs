@@ -69,6 +69,7 @@ services:
       DB_PASSWORD: product123
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED: "false"
   inventory-service:
     build: ./inventory-service
     container_name: inventory-service
