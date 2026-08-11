@@ -13,6 +13,7 @@ import com.product.repository.BrandRepository;
 import com.product.repository.CategoryRepository;
 import com.product.repository.SkuRepository;
 import com.product.repository.SpuRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class SpuWriteService {
         this.objectMapper = objectMapper;
     }
 
+    @CacheEvict(cacheNames = "product:detail", allEntries = true)
     public SpuResponse create(SpuCreateRequest request) {
         Spu spu = new Spu();
         apply(spu, request);
@@ -50,6 +52,7 @@ public class SpuWriteService {
         return toResponse(saved);
     }
 
+    @CacheEvict(cacheNames = "product:detail", allEntries = true)
     public SpuResponse update(UUID id, SpuCreateRequest request) {
         Spu spu = spuRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在: " + id));
@@ -61,12 +64,14 @@ public class SpuWriteService {
         return toResponse(spu);
     }
 
+    @CacheEvict(cacheNames = "product:detail", allEntries = true)
     public void changeStatus(UUID id, SpuStatus status) {
         Spu spu = spuRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在: " + id));
         spu.setStatus(status);
     }
 
+    @CacheEvict(cacheNames = "product:detail", allEntries = true)
     public void delete(UUID id) {
         if (!spuRepository.existsById(id)) {
             throw new IllegalArgumentException("商品不存在: " + id);

@@ -15,6 +15,7 @@ import com.product.dto.response.SkuResponse;
 import com.product.dto.response.SpuResponse;
 import com.product.repository.SpuRepository;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ public class ProductQueryService {
         this.objectMapper = objectMapper;
     }
 
+    @Cacheable(cacheNames = "product:detail", key = "#id")
     public SpuResponse detail(UUID id) {
         Spu spu = spuRepository.findByIdWithSkus(id)
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在: " + id));
