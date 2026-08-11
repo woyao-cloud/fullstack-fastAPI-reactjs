@@ -12,7 +12,6 @@ import java.util.Map;
 public record SkuRequest(
         @NotNull Map<String, String> specs,
         @NotNull @Positive BigDecimal price,
-        int stock,
         @NotBlank @Size(max = 50) String skuCode,
         String barCode,
         BigDecimal weight,

@@ -9,11 +9,10 @@ public record SkuResponse(
         UUID id,
         Map<String, String> specs,
         BigDecimal price,
-        int stock,
-        int lockedStock,
         String skuCode,
         String barCode,
         BigDecimal weight,
         List<String> images,
-        boolean isActive
+        boolean isActive,
+        int available
 ) {}

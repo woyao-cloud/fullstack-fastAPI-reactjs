@@ -23,12 +23,6 @@ public class Sku {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @Column(nullable = false)
-    private int stock;
-
-    @Column(name = "locked_stock", nullable = false)
-    private int lockedStock;
-
     @Column(name = "sku_code", nullable = false, unique = true, length = 50)
     private String skuCode;
 
@@ -69,10 +63,6 @@ public class Sku {
     public void setSpecs(String specs) { this.specs = specs; }
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
-    public int getStock() { return stock; }
-    public void setStock(int stock) { this.stock = stock; }
-    public int getLockedStock() { return lockedStock; }
-    public void setLockedStock(int lockedStock) { this.lockedStock = lockedStock; }
     public String getSkuCode() { return skuCode; }
     public void setSkuCode(String skuCode) { this.skuCode = skuCode; }
     public String getBarCode() { return barCode; }
