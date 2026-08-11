@@ -104,7 +104,11 @@ bash scripts/test-data/load-test-data.sh
 ## 幂等与重置
 
 - 每个 SQL 开头 `TRUNCATE` 相关表后重新插入，**可反复执行**，结果始终一致。
-- 想重置：直接重跑脚本即可，无需手动清库。
+- 想重置数据：直接重跑脚本即可，无需手动清库。
+- 想同时重建表结构：`docker compose down -v`（删除数据卷，会清空全部数据）
+  后重新 `docker compose up -d --build`——postgres 容器会在首次建卷时自动执行
+  各模块的 Flyway 迁移脚本建表（见 `docker-compose.yml` 的
+  `/docker-entrypoint-initdb.d` 挂载），**随后需重新运行本脚本加载测试数据**。
 
 ## 一致性说明
 

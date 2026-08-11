@@ -7,6 +7,10 @@ services:
       POSTGRES_USER: product
       POSTGRES_PASSWORD: product123
       POSTGRES_DB: product_service
+    # 首次创建数据卷时按字母序执行 Flyway 迁移脚本(V1..V5)建表；
+    # 已存在的卷不会重跑(幂等)。重建 schema: docker compose down -v && up -d
+    volumes:
+      - ./product-service/src/main/resources/db/migration:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U product -d product_service"]
       interval: 5s
@@ -20,6 +24,8 @@ services:
       POSTGRES_USER: inventory
       POSTGRES_PASSWORD: inventory123
       POSTGRES_DB: inventory_service
+    volumes:
+      - ./inventory-service/src/main/resources/db/migration:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U inventory -d inventory_service"]
       interval: 5s
@@ -33,6 +39,8 @@ services:
       POSTGRES_USER: order
       POSTGRES_PASSWORD: order123
       POSTGRES_DB: order_service
+    volumes:
+      - ./order-service/src/main/resources/db/migration:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U order -d order_service"]
       interval: 5s
@@ -76,6 +84,9 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED: "false"
+      # initdb 已在 /docker-entrypoint-initdb.d 建表 -> 非空 schema 无 history 时打 baseline 到最新版本
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_VERSION: "5"
   inventory-service:
     build: ./inventory-service
     container_name: inventory-service
@@ -91,6 +102,8 @@ services:
       DB_USER: inventory
       DB_PASSWORD: inventory123
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_VERSION: "1"
   order-service:
     build: ./order-service
     container_name: order-service
@@ -108,3 +121,5 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       INVENTORY_SERVICE_URL: http://inventory-service:8082
       PRODUCT_SERVICE_URL: http://product-service:8081
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_VERSION: "2"
