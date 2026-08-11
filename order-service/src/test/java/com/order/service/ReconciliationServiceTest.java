@@ -57,12 +57,13 @@ class ReconciliationServiceTest {
 
     @Test
     void shouldFlagPaidOrderWithoutConfirmedInventory() {
+        // 异常态：confirm 未反映，frozen 仍持有应确认量（5 == 5）→ 告警
         UUID orderId = UUID.randomUUID(), skuId = UUID.randomUUID();
         Order paid = paidOrder(orderId, Instant.now().minus(Duration.ofMinutes(30)));
         when(orderRepository.findByStatusAndPaidAtBefore(eq(OrderStatus.PAID), any()))
                 .thenReturn(List.of(paid));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item(orderId, skuId, 5)));
-        when(inventoryClient.getStock(skuId)).thenReturn(new InventoryClient.InventoryStock(skuId, 10, 0, 10));
+        when(inventoryClient.getStock(skuId)).thenReturn(new InventoryClient.InventoryStock(skuId, 10, 5, 5));
 
         service.reconcile();
 
@@ -71,13 +72,14 @@ class ReconciliationServiceTest {
     }
 
     @Test
-    void shouldNotFlagPaidOrderWithSufficientFrozen() {
+    void shouldNotFlagPaidOrderWithConfirmedInventory() {
+        // 正常态：confirm 已反映，frozen 已释放（0 < 5）→ 不告警
         UUID orderId = UUID.randomUUID(), skuId = UUID.randomUUID();
         Order paid = paidOrder(orderId, Instant.now().minus(Duration.ofMinutes(30)));
         when(orderRepository.findByStatusAndPaidAtBefore(eq(OrderStatus.PAID), any()))
                 .thenReturn(List.of(paid));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item(orderId, skuId, 5)));
-        when(inventoryClient.getStock(skuId)).thenReturn(new InventoryClient.InventoryStock(skuId, 10, 5, 5));
+        when(inventoryClient.getStock(skuId)).thenReturn(new InventoryClient.InventoryStock(skuId, 10, 0, 10));
 
         service.reconcile();
 
@@ -111,12 +113,12 @@ class ReconciliationServiceTest {
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(
                 item(orderId, shortSku, 2),
                 item(orderId, fineSku, 1)));
-        when(inventoryClient.getStock(shortSku)).thenReturn(new InventoryClient.InventoryStock(shortSku, 2, 0, 2));
-        when(inventoryClient.getStock(fineSku)).thenReturn(new InventoryClient.InventoryStock(fineSku, 1, 1, 0));
+        when(inventoryClient.getStock(shortSku)).thenReturn(new InventoryClient.InventoryStock(shortSku, 2, 2, 0));
+        when(inventoryClient.getStock(fineSku)).thenReturn(new InventoryClient.InventoryStock(fineSku, 1, 0, 1));
 
         service.reconcile();
 
-        // 只有 shortSku 冻结量不足，恰好 1 次告警
+        // 只有 shortSku 仍未确认（frozen 仍持有 2），恰好 1 次告警
         assertThat(service.getAlertCount()).isEqualTo(1);
         verify(inventoryClient).getStock(shortSku);
         verify(inventoryClient).getStock(fineSku);
@@ -132,11 +134,11 @@ class ReconciliationServiceTest {
                 item(orderId, badSku, 2),
                 item(orderId, goodSku, 1)));
         when(inventoryClient.getStock(badSku)).thenThrow(new RuntimeException("Feign 500"));
-        when(inventoryClient.getStock(goodSku)).thenReturn(new InventoryClient.InventoryStock(goodSku, 1, 0, 1));
+        when(inventoryClient.getStock(goodSku)).thenReturn(new InventoryClient.InventoryStock(goodSku, 1, 1, 0));
 
         service.reconcile();
 
-        // badSku 查询失败被跳过，goodSku 不足仍告警 1 次，整体不中断
+        // badSku 查询失败被跳过，goodSku 未确认仍告警 1 次，整体不中断
         assertThat(service.getAlertCount()).isEqualTo(1);
         verify(inventoryClient).getStock(badSku);
         verify(inventoryClient).getStock(goodSku);

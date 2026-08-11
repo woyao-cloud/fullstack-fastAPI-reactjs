@@ -54,7 +54,9 @@ public class ReconciliationService {
                     log.warn("[对账] 查询库存失败，跳过 orderNo={} skuId={}: {}", order.getOrderNo(), e.getKey(), ex.getMessage());
                     continue;
                 }
-                if (frozen < e.getValue()) {
+                // 订单下单时 reserve 使 frozen += 应确认量；PAID 事件被 inventory 消费 confirm 后 frozen 相应下降。
+                // 故「已支付但未确认扣减」= frozen 仍 ≥ 应确认量（扣减未反映），此时才告警。
+                if (frozen >= e.getValue()) {
                     long n = alertCount.incrementAndGet();
                     log.warn("[对账] 已支付超时未确认扣减 orderNo={} skuId={} 应确认量={} 冻结量={} (累计告警 {})",
                             order.getOrderNo(), e.getKey(), e.getValue(), frozen, n);

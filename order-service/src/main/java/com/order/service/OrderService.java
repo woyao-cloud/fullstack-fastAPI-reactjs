@@ -13,12 +13,16 @@ import com.order.repository.CartRepository;
 import com.order.repository.OrderItemRepository;
 import com.order.repository.OrderRepository;
 import com.order.repository.PaymentRepository;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -47,8 +51,23 @@ public class OrderService {
     }
 
     public OrderResponse createOrder(UUID userId, CreateOrderRequest req) {
+        if (req.lines().isEmpty()) {
+            throw new IllegalArgumentException("订单至少包含一个商品");
+        }
         List<UUID> skuIds = req.lines().stream().map(l -> l.skuId()).toList();
+        if (skuIds.stream().distinct().count() != skuIds.size()) {
+            throw new IllegalArgumentException("订单行存在重复SKU");
+        }
         List<SkuSnapshot> snapshots = productClient.batchSkus(skuIds);
+        Set<UUID> snapshotIds = new HashSet<>();
+        for (SkuSnapshot s : snapshots) {
+            snapshotIds.add(s.id());
+        }
+        for (OrderLine line : req.lines()) {
+            if (!snapshotIds.contains(line.skuId())) {
+                throw new IllegalArgumentException("商品不存在: " + line.skuId());
+            }
+        }
         Order order = new Order();
         order.setOrderNo("NO" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 6));
         order.setUserId(userId);
@@ -162,6 +181,6 @@ public class OrderService {
                 .map(i -> new OrderEvent.Item(i.getSkuId(), i.getQuantity())).toList();
     }
 
-    public record CreateOrderRequest(List<OrderLine> lines) {}
-    public record OrderLine(UUID skuId, int quantity) {}
+    public record CreateOrderRequest(@NotEmpty(message = "订单至少包含一个商品") List<OrderLine> lines) {}
+    public record OrderLine(UUID skuId, @Min(value = 1, message = "购买数量必须大于0") int quantity) {}
 }

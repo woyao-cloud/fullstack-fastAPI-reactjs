@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,6 +75,37 @@ class OrderServiceTest {
                 new OrderService.CreateOrderRequest(List.of(new OrderService.OrderLine(skuId, 5))));
 
         assertThat(result.status()).isEqualTo(OrderStatus.CLOSED);
+    }
+
+    @Test
+    void shouldRejectEmptyLines() {
+        assertThatThrownBy(() -> service.createOrder(UUID.randomUUID(),
+                new OrderService.CreateOrderRequest(List.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("至少包含一个商品");
+    }
+
+    @Test
+    void shouldRejectDuplicateSkuInLines() {
+        // 重复检查发生在 batchSkus 之前，无需 stub 库存查询
+        UUID skuId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.createOrder(UUID.randomUUID(),
+                new OrderService.CreateOrderRequest(List.of(
+                        new OrderService.OrderLine(skuId, 1),
+                        new OrderService.OrderLine(skuId, 1)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("重复SKU");
+    }
+
+    @Test
+    void shouldRejectUnknownSkuInLines() {
+        UUID skuId = UUID.randomUUID();
+        when(productClient.batchSkus(List.of(skuId))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.createOrder(UUID.randomUUID(),
+                new OrderService.CreateOrderRequest(List.of(new OrderService.OrderLine(skuId, 1)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("商品不存在");
     }
 
     @Test

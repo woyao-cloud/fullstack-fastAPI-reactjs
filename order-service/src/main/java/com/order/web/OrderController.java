@@ -2,6 +2,7 @@ package com.order.web;
 
 import com.order.service.OrderResponse;
 import com.order.service.OrderService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -19,7 +20,7 @@ public class OrderController {
     }
 
     @PostMapping
-    public OrderResponse create(@RequestBody OrderService.CreateOrderRequest req) {
+    public OrderResponse create(@Valid @RequestBody OrderService.CreateOrderRequest req) {
         return orderService.createOrder(userContext.currentUserId(), req);
     }
 
