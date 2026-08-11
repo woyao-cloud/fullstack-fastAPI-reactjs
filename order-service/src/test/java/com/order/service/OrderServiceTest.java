@@ -86,6 +86,15 @@ class OrderServiceTest {
     }
 
     @Test
+    void shouldRejectInvalidQuantity() {
+        UUID skuId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.createOrder(UUID.randomUUID(),
+                new OrderService.CreateOrderRequest(List.of(new OrderService.OrderLine(skuId, 0)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("购买数量必须大于0");
+    }
+
+    @Test
     void shouldRejectDuplicateSkuInLines() {
         // 重复检查发生在 batchSkus 之前，无需 stub 库存查询
         UUID skuId = UUID.randomUUID();

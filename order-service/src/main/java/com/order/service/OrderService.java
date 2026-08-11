@@ -13,6 +13,7 @@ import com.order.repository.CartRepository;
 import com.order.repository.OrderItemRepository;
 import com.order.repository.OrderRepository;
 import com.order.repository.PaymentRepository;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -53,6 +54,11 @@ public class OrderService {
     public OrderResponse createOrder(UUID userId, CreateOrderRequest req) {
         if (req.lines().isEmpty()) {
             throw new IllegalArgumentException("订单至少包含一个商品");
+        }
+        for (OrderLine line : req.lines()) {
+            if (line.quantity() < 1) {
+                throw new IllegalArgumentException("购买数量必须大于0");
+            }
         }
         List<UUID> skuIds = req.lines().stream().map(l -> l.skuId()).toList();
         if (skuIds.stream().distinct().count() != skuIds.size()) {
@@ -181,6 +187,6 @@ public class OrderService {
                 .map(i -> new OrderEvent.Item(i.getSkuId(), i.getQuantity())).toList();
     }
 
-    public record CreateOrderRequest(@NotEmpty(message = "订单至少包含一个商品") List<OrderLine> lines) {}
+    public record CreateOrderRequest(@NotEmpty(message = "订单至少包含一个商品") List<@Valid OrderLine> lines) {}
     public record OrderLine(UUID skuId, @Min(value = 1, message = "购买数量必须大于0") int quantity) {}
 }
