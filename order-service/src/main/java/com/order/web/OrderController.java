@@ -1,5 +1,6 @@
 package com.order.web;
 
+import com.order.domain.entity.OrderStatus;
 import com.order.service.OrderResponse;
 import com.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -22,6 +23,14 @@ public class OrderController {
     @PostMapping
     public OrderResponse create(@Valid @RequestBody OrderService.CreateOrderRequest req) {
         return orderService.createOrder(userContext.currentUserId(), req);
+    }
+
+    @GetMapping
+    public PageResponse<OrderResponse> list(
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return orderService.listOrders(userContext.currentUserId(), status, page, size);
     }
 
     @GetMapping("/{id}")

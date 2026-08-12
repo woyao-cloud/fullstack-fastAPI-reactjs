@@ -13,12 +13,17 @@ import com.order.repository.CartRepository;
 import com.order.repository.OrderItemRepository;
 import com.order.repository.OrderRepository;
 import com.order.repository.PaymentRepository;
+import com.order.web.PageResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -111,21 +116,39 @@ public class OrderService {
         if (!reserve.success()) {
             saved.setStatus(OrderStatus.CLOSED);
             saved.setClosedAt(java.time.Instant.now());
-            return toResponse(saved); // 保留记录，可对账
+            return toResponse(saved, items); // 保留记录，可对账
         }
         // 只删除本次下单的购物车项; 已勾选但未下单的项保留 (review I3)
         cartRepository.deleteByUserIdAndSkuIdIn(userId, skuIds);
-        return toResponse(saved);
+        return toResponse(saved, items);
+    }
+
+    public PageResponse<OrderResponse> listOrders(UUID userId, OrderStatus status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Order> p = (status == null)
+                ? orderRepository.findByUserId(userId, pageable)
+                : orderRepository.findByUserIdAndStatus(userId, status, pageable);
+        return new PageResponse<>(p.getContent().stream()
+                .map(o -> toResponse(o, orderItemRepository.findByOrderId(o.getId()))).toList(),
+                p.getTotalElements(), page, size);
     }
 
     public OrderResponse getOrder(UUID orderId, UUID userId) {
-        return orderRepository.findByIdAndUserId(orderId, userId).map(OrderService::toResponse)
+        return orderRepository.findByIdAndUserId(orderId, userId)
+                .map(o -> toResponse(o, orderItemRepository.findByOrderId(orderId)))
                 .orElseThrow(() -> new IllegalArgumentException("订单不存在: " + orderId));
     }
 
-    private static OrderResponse toResponse(Order order) {
+    private static OrderResponse toResponse(Order order, List<OrderItem> items) {
         return new OrderResponse(order.getId(), order.getOrderNo(), order.getStatus(),
-                order.getTotalAmount(), order.getPaidAt(), order.getClosedAt());
+                order.getTotalAmount(), order.getPaidAt(), order.getClosedAt(),
+                items.stream().map(OrderService::toItem).toList());
+    }
+
+    private static OrderResponse.OrderItemResponse toItem(OrderItem i) {
+        return new OrderResponse.OrderItemResponse(
+                i.getSkuId(), i.getProductName(), i.getSkuSpec(),
+                i.getPrice(), i.getQuantity(), i.getSubtotal());
     }
 
     public void pay(UUID orderId, UUID userId) {
