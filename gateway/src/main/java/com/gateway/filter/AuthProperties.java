@@ -10,7 +10,8 @@ public record AuthProperties(
     String jwtSecretKey,
     String jwtAlgorithm,
     List<String> excludePaths,
-    Blacklist blacklist
+    Blacklist blacklist,
+    List<String> publicReadPaths
 ) {
     public record Blacklist(Duration redisTimeout, boolean degradeOnFailure) {}
 }

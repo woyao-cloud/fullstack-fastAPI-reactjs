@@ -45,6 +45,10 @@ public class AuthGlobalFilter implements GlobalFilter {
             return chain.filter(exchange);
         }
 
+        if (isPublicRead(path, exchange.getRequest().getMethod().name())) {
+            return chain.filter(exchange);
+        }
+
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             return errorResponse(exchange, HttpStatus.UNAUTHORIZED, "缺少认证凭据");
@@ -72,6 +76,13 @@ public class AuthGlobalFilter implements GlobalFilter {
 
     private boolean isExcluded(String path) {
         return props.excludePaths().stream().anyMatch(p -> matcher.match(p, path));
+    }
+
+    private boolean isPublicRead(String path, String method) {
+        if (!"GET".equals(method)) {
+            return false;
+        }
+        return props.publicReadPaths().stream().anyMatch(p -> matcher.match(p, path));
     }
 
     private Mono<Void> forwardWithUserHeaders(ServerWebExchange exchange, GatewayFilterChain chain,

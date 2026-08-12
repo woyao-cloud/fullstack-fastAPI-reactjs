@@ -24,7 +24,7 @@ class JwtParserTest {
 
     @BeforeEach
     void setUp() {
-        parser = new JwtParser(new AuthProperties(secret, "HS256", List.of(), null));
+        parser = new JwtParser(new AuthProperties(secret, "HS256", List.of(), null, List.of()));
     }
 
     private String createToken(String userId, String email, List<String> permissions,
@@ -68,7 +68,7 @@ class JwtParserTest {
 
     @Test
     void shouldRejectTokenWithWrongSecret() throws Exception {
-        JwtParser otherParser = new JwtParser(new AuthProperties("wrong-secret-key-at-least-256-bits!!!", "HS256", List.of(), null));
+        JwtParser otherParser = new JwtParser(new AuthProperties("wrong-secret-key-at-least-256-bits!!!", "HS256", List.of(), null, List.of()));
         String token = createToken("user-123", "test@example.com", List.of(),
                 Instant.now(), Instant.now().plusSeconds(3600));
 

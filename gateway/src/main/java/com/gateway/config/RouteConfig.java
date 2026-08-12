@@ -13,6 +13,21 @@ public class RouteConfig {
     @Bean
     public RouteLocator routes(RouteLocatorBuilder builder) {
         return builder.routes()
+                .route("product-service", r -> r
+                        .path("/api/v1/products/**", "/api/v1/categories/**", "/api/v1/brands/**")
+                        .uri("http://product-service:8081"))
+                .route("inventory-service", r -> r
+                        .path("/api/v1/inventory/**")
+                        .uri("http://inventory-service:8082"))
+                .route("order-service", r -> r
+                        .path("/api/v1/cart/**", "/api/v1/orders/**")
+                        .uri("http://order-service:8083"))
+                .route("order-internal", r -> r
+                        .path("/internal/orders/**")
+                        .filters(f -> f.circuitBreaker(c -> c
+                                .setName("order-internal")
+                                .setFallbackUri("forward:/fallback/order-internal")))
+                        .uri("http://order-service:8083"))
                 .route("user-service", r -> r
                         .path("/api/v1/**")
                         .filters(f -> f.circuitBreaker(c -> c

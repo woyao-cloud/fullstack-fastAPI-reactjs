@@ -29,7 +29,8 @@ class AuthGlobalFilterTest {
     private TokenBlacklist blacklist = mock(TokenBlacklist.class);
     private AuthProperties props = new AuthProperties("secret", "HS256",
             List.of("/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh", "/api/v1/auth/login/oauth"),
-            new AuthProperties.Blacklist(Duration.ofMillis(50), true));
+            new AuthProperties.Blacklist(Duration.ofMillis(50), true),
+            List.of("/api/v1/products/**", "/api/v1/categories/**", "/api/v1/brands/**", "/api/v1/inventory/**"));
     private AuthGlobalFilter filter = new AuthGlobalFilter(jwtParser, blacklist, props);
     private GatewayFilterChain chain = mock(GatewayFilterChain.class);
 
@@ -86,6 +87,22 @@ class AuthGlobalFilterTest {
 
         filter.filter(exchange, chain).subscribe();
 
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void allowsAnonymousGetOnPublicReadPaths() {
+        var exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/products/search").build());
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
+    void stillRequiresAuthForPublicReadWrites() {
+        var exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/products").build());
+        filter.filter(exchange, chain).subscribe();
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }
