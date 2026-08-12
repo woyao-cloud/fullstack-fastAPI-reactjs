@@ -17,4 +17,11 @@ public class FallbackController {
                 .status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("detail", "服务暂时不可用")));
     }
+
+    @RequestMapping("/fallback/order-internal")
+    public Mono<ResponseEntity<Map<String, String>>> orderInternalFallback() {
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("detail", "服务暂时不可用")));
+    }
 }
