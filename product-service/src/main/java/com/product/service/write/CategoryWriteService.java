@@ -60,6 +60,17 @@ public class CategoryWriteService {
         if (request.parentId() != null) {
             Category parent = categoryRepository.findById(request.parentId())
                     .orElseThrow(() -> new IllegalArgumentException("父分类不存在: " + request.parentId()));
+            if (parent.getId().equals(id)) {
+                throw new IllegalArgumentException("父分类不能是自身");
+            }
+            // 防环: 沿父链上溯, 若命中当前分类说明父分类是其后代, 会成环
+            Category cursor = parent;
+            while (cursor.getParent() != null) {
+                if (cursor.getParent().getId().equals(id)) {
+                    throw new IllegalArgumentException("父分类不能是自身后代");
+                }
+                cursor = cursor.getParent();
+            }
             category.setParent(parent);
         } else {
             category.setParent(null);

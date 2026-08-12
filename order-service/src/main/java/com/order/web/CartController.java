@@ -2,6 +2,7 @@ package com.order.web;
 
 import com.order.domain.entity.Cart;
 import com.order.service.CartService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,7 +21,7 @@ public class CartController {
     }
 
     @PostMapping
-    public void add(@RequestBody CartService.AddItemRequest req) {
+    public void add(@Valid @RequestBody CartService.AddItemRequest req) {
         cartService.add(userContext.currentUserId(), req);
     }
 

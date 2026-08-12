@@ -2,6 +2,9 @@ package com.order.service;
 
 import com.order.domain.entity.Cart;
 import com.order.repository.CartRepository;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,5 +42,8 @@ public class CartService {
         cartRepository.findByUserIdAndSkuId(userId, skuId).ifPresent(c -> { c.setChecked(checked); });
     }
 
-    public record AddItemRequest(UUID skuId, int quantity) {}
+    public record AddItemRequest(
+            @NotNull UUID skuId,
+            @NotNull @Min(1) @Max(999) int quantity
+    ) {}
 }

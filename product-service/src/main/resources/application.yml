@@ -43,3 +43,8 @@ management:
     web:
       exposure:
         include: health,metrics
+
+# 服务间调用共享 token, /internal/** 需携带 X-Internal-Token (与 docker-compose 一致)
+internal:
+  api:
+    token: ${INTERNAL_API_TOKEN:dev-internal-token}

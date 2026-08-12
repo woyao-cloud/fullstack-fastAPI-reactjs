@@ -7,6 +7,7 @@ import com.product.dto.response.PageResponse;
 import com.product.dto.response.SpuResponse;
 import com.product.service.read.ProductQueryService;
 import com.product.service.write.SpuWriteService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -24,10 +25,10 @@ public class ProductController {
     }
 
     @PostMapping
-    public SpuResponse create(@RequestBody SpuCreateRequest req) { return writeService.create(req); }
+    public SpuResponse create(@Valid @RequestBody SpuCreateRequest req) { return writeService.create(req); }
 
     @PutMapping("/{id}")
-    public SpuResponse update(@PathVariable UUID id, @RequestBody SpuCreateRequest req) { return writeService.update(id, req); }
+    public SpuResponse update(@PathVariable UUID id, @Valid @RequestBody SpuCreateRequest req) { return writeService.update(id, req); }
 
     @PatchMapping("/{id}/status")
     public void changeStatus(@PathVariable UUID id, @RequestBody SpuStatus status) { writeService.changeStatus(id, status); }

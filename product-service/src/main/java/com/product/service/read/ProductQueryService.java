@@ -44,6 +44,12 @@ public class ProductQueryService {
     }
 
     public List<SkuSnapshot> batchSkus(List<UUID> skuIds) {
+        if (skuIds == null || skuIds.isEmpty()) {
+            return List.of();
+        }
+        if (skuIds.size() > 500) {
+            throw new IllegalArgumentException("批量查询SKU数量不能超过500");
+        }
         return skuRepository.findByIdsWithSpu(skuIds).stream()
                 .map(s -> new SkuSnapshot(s.getId(), s.getSpu().getName(), s.getSpecs(), s.getPrice()))
                 .toList();
@@ -71,16 +77,25 @@ public class ProductQueryService {
                 ps.add(cb.equal(root.get("brand").get("name"), req.brand()));
             }
             if (req.minPrice() != null && !req.minPrice().isBlank()) {
-                ps.add(cb.greaterThanOrEqualTo(root.get("skus").get("price"), new BigDecimal(req.minPrice())));
+                ps.add(cb.greaterThanOrEqualTo(root.get("skus").get("price"), parsePrice(req.minPrice(), "minPrice")));
             }
             if (req.maxPrice() != null && !req.maxPrice().isBlank()) {
-                ps.add(cb.lessThanOrEqualTo(root.get("skus").get("price"), new BigDecimal(req.maxPrice())));
+                ps.add(cb.lessThanOrEqualTo(root.get("skus").get("price"), parsePrice(req.maxPrice(), "maxPrice")));
             }
             return cb.and(ps.toArray(new Predicate[0]));
         };
-        var page = spuRepository.findAll(spec, PageRequest.of(req.page(), req.size()));
+        int size = Math.min(req.size(), 100); // 分页上限, 防全表拉取
+        var page = spuRepository.findAll(spec, PageRequest.of(req.page(), size));
         return new PageResponse<>(page.getContent().stream().map(this::toResponse).toList(),
-                page.getTotalElements(), req.page(), req.size());
+                page.getTotalElements(), req.page(), size);
+    }
+
+    private BigDecimal parsePrice(String raw, String field) {
+        try {
+            return new BigDecimal(raw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(field + " 格式错误: " + raw);
+        }
     }
 
     private SpuResponse toResponse(Spu spu) {

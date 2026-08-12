@@ -3,10 +3,11 @@ package com.inventory.web;
 import com.inventory.dto.InventoryStock;
 import com.inventory.dto.ReserveRequest;
 import com.inventory.dto.ReserveResult;
+import com.inventory.dto.RestockRequest;
 import com.inventory.service.InventoryService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -18,13 +19,13 @@ public class InventoryController {
     public InventoryController(InventoryService inventoryService) { this.inventoryService = inventoryService; }
 
     @PostMapping("/reserve")
-    public ReserveResult reserve(@RequestBody ReserveRequest req) {
+    public ReserveResult reserve(@Valid @RequestBody ReserveRequest req) {
         return inventoryService.reserve(req.items());
     }
 
     @PostMapping("/restock")
-    public void restock(@RequestBody Map<String, Object> body) {
-        inventoryService.restock(UUID.fromString((String) body.get("skuId")), (Integer) body.get("quantity"));
+    public void restock(@Valid @RequestBody RestockRequest req) {
+        inventoryService.restock(req.skuId(), req.quantity());
     }
 
     @GetMapping("/{skuId}")

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: product
       POSTGRES_PASSWORD: product123
       POSTGRES_DB: product_service
-    # 首次创建数据卷时按字母序执行 Flyway 迁移脚本(V1..V5)建表；
+    # 首次创建数据卷时按字母序执行 Flyway 迁移脚本(V1..V6)建表；
     # 已存在的卷不会重跑(幂等)。重建 schema: docker compose down -v && up -d
     volumes:
       - ./product-service/src/main/resources/db/migration:/docker-entrypoint-initdb.d:ro
@@ -84,9 +84,11 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED: "false"
+      # 服务间共享 token, /internal/** 需携带 X-Internal-Token
+      INTERNAL_API_TOKEN: dev-internal-token
       # initdb 已在 /docker-entrypoint-initdb.d 建表 -> 非空 schema 无 history 时打 baseline 到最新版本
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
-      SPRING_FLYWAY_BASELINE_VERSION: "5"
+      SPRING_FLYWAY_BASELINE_VERSION: "6"
   inventory-service:
     build: ./inventory-service
     container_name: inventory-service
@@ -102,6 +104,7 @@ services:
       DB_USER: inventory
       DB_PASSWORD: inventory123
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      INTERNAL_API_TOKEN: dev-internal-token
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
       SPRING_FLYWAY_BASELINE_VERSION: "1"
   order-service:
@@ -121,5 +124,6 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       INVENTORY_SERVICE_URL: http://inventory-service:8082
       PRODUCT_SERVICE_URL: http://product-service:8081
+      INTERNAL_API_TOKEN: dev-internal-token
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
       SPRING_FLYWAY_BASELINE_VERSION: "2"

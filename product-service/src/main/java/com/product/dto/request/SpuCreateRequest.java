@@ -1,5 +1,6 @@
 package com.product.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -17,7 +18,7 @@ public record SpuCreateRequest(
         List<String> images,
         List<SpecTemplate> specsTemplate,
         List<String> tags,
-        @NotEmpty List<SkuRequest> skus
+        @NotEmpty List<@Valid SkuRequest> skus
 ) {
     public record SpecTemplate(String key, List<String> values) {}
 }

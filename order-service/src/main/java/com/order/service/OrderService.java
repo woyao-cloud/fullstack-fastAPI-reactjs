@@ -14,11 +14,16 @@ import com.order.repository.OrderItemRepository;
 import com.order.repository.OrderRepository;
 import com.order.repository.PaymentRepository;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -108,7 +113,8 @@ public class OrderService {
             saved.setClosedAt(java.time.Instant.now());
             return toResponse(saved); // 保留记录，可对账
         }
-        cartRepository.deleteByUserIdAndCheckedTrue(userId);
+        // 只删除本次下单的购物车项; 已勾选但未下单的项保留 (review I3)
+        cartRepository.deleteByUserIdAndSkuIdIn(userId, skuIds);
         return toResponse(saved);
     }
 
@@ -135,7 +141,7 @@ public class OrderService {
         payment.setChannel("MOCK");
         payment.setPaidAt(order.getPaidAt());
         paymentRepository.save(payment);
-        publisher.publish(OrderEvent.EventType.PAID, orderId, order.getOrderNo(), itemsOf(orderId));
+        publishAfterCommit(OrderEvent.EventType.PAID, order, itemsOf(orderId));
     }
 
     public void refund(UUID orderId, UUID userId) {
@@ -143,7 +149,7 @@ public class OrderService {
         requireStatus(order, OrderStatus.PAID);   // 仅已支付可退
         order.setStatus(OrderStatus.REFUNDING);
         order.setStatus(OrderStatus.REFUNDED);    // 模拟立即退款成功
-        publisher.publish(OrderEvent.EventType.REFUNDED, orderId, order.getOrderNo(), itemsOf(orderId));
+        publishAfterCommit(OrderEvent.EventType.REFUNDED, order, itemsOf(orderId));
     }
 
     @Scheduled(fixedDelay = 60000)   // 每分钟扫一次
@@ -153,7 +159,7 @@ public class OrderService {
         for (Order order : expired) {
             order.setStatus(OrderStatus.CLOSED);
             order.setClosedAt(java.time.Instant.now());
-            publisher.publish(OrderEvent.EventType.CLOSED, order.getId(), order.getOrderNo(), itemsOf(order.getId()));
+            publishAfterCommit(OrderEvent.EventType.CLOSED, order, itemsOf(order.getId()));
         }
     }
 
@@ -162,7 +168,7 @@ public class OrderService {
         requireStatus(order, OrderStatus.PENDING_PAYMENT);
         order.setStatus(OrderStatus.CLOSED);
         order.setClosedAt(java.time.Instant.now());
-        publisher.publish(OrderEvent.EventType.CANCELLED, orderId, order.getOrderNo(), itemsOf(orderId));
+        publishAfterCommit(OrderEvent.EventType.CANCELLED, order, itemsOf(orderId));
     }
 
     public void ship(UUID orderId, UUID userId) {
@@ -187,6 +193,23 @@ public class OrderService {
                 .map(i -> new OrderEvent.Item(i.getSkuId(), i.getQuantity())).toList();
     }
 
-    public record CreateOrderRequest(@NotEmpty(message = "订单至少包含一个商品") List<@Valid OrderLine> lines) {}
-    public record OrderLine(UUID skuId, @Min(value = 1, message = "购买数量必须大于0") int quantity) {}
+    // 事件在事务提交后才发送, 避免回滚后仍有幽灵事件上 broker (review C1);
+    // 无事务上下文(如单元测试直调)时直接发送
+    private void publishAfterCommit(OrderEvent.EventType type, Order order, List<OrderEvent.Item> items) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publisher.publish(type, order.getId(), order.getOrderNo(), items);
+                }
+            });
+        } else {
+            publisher.publish(type, order.getId(), order.getOrderNo(), items);
+        }
+    }
+
+    public record CreateOrderRequest(
+            @NotEmpty(message = "订单至少包含一个商品") @Size(max = 50, message = "订单行数不能超过50") List<@Valid OrderLine> lines) {}
+    public record OrderLine(@NotNull(message = "SKU不能为空") UUID skuId,
+                            @Min(value = 1, message = "购买数量必须大于0") @Max(value = 999, message = "单行购买数量不能超过999") int quantity) {}
 }

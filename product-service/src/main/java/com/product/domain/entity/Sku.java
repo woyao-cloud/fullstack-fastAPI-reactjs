@@ -1,6 +1,8 @@
 package com.product.domain.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -17,6 +19,7 @@ public class Sku {
     @JoinColumn(name = "spu_id", nullable = false)
     private Spu spu;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false)
     private String specs = "{}";
 
@@ -26,17 +29,21 @@ public class Sku {
     @Column(name = "sku_code", nullable = false, unique = true, length = 50)
     private String skuCode;
 
-    @Column(name = "bar_code", length = 50)
+    @Column(name = "bar_code", unique = true, length = 50)
     private String barCode;
 
     @Column(precision = 10, scale = 3)
     private BigDecimal weight;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column
     private String images;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
+
+    @Version
+    private long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -73,6 +80,7 @@ public class Sku {
     public void setImages(String images) { this.images = images; }
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+    public long getVersion() { return version; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

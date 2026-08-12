@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -23,6 +24,7 @@ public class Inventory {
     @Column(nullable = false)
     private int frozen;
 
+    @Version
     @Column(nullable = false)
     private long version;
 

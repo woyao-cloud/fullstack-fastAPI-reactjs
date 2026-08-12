@@ -28,16 +28,18 @@ public class Spu {
     @JoinColumn(name = "brand_id")
     private Brand brand;
 
-    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
     private SpuStatus status = SpuStatus.draft;
 
     @Column(name = "cover_image", length = 255)
     private String coverImage;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false)
     private String images = "[]";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "specs_template", nullable = false)
     private String specsTemplate = "[]";
 
@@ -47,6 +49,9 @@ public class Spu {
 
     @OneToMany(mappedBy = "spu", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Sku> skus = new ArrayList<>();
+
+    @Version
+    private long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -87,6 +92,7 @@ public class Spu {
     public void setTags(String tags) { this.tags = tags; }
     public List<Sku> getSkus() { return skus; }
     public void setSkus(List<Sku> skus) { this.skus = skus; }
+    public long getVersion() { return version; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
