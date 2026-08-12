@@ -1013,7 +1013,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 ```
-`app/page.tsx`：`redirect("/storefront")`（商城首页）。
+`app/page.tsx`：最小占位页（**不要** redirect —— 商城首页在 Task 8 落在 `/` 的 `(storefront)/page.tsx`，届时本占位页被其取代）：
+```tsx
+export default function Home() {
+  return (
+    <main className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+      商城加载中…
+    </main>
+  );
+}
+```
 
 - [ ] **Step 5: 初始化 shadcn/ui 与基础组件**
 
@@ -1282,12 +1291,12 @@ git commit -m "feat(frontend): API 层 + DTO 类型 + 401 并发刷新"
 - Create: `frontend/stores/auth.ts`
 - Create: `frontend/app/(auth)/login/page.tsx`
 - Create: `frontend/components/shared/permission-guard.tsx`
-- Create: `frontend/app/(admin)/layout.tsx`
+- Create: `frontend/app/admin/layout.tsx`
 - Test: `frontend/__tests__/stores/auth.test.ts`
 
 **Interfaces:**
 - Consumes: `useAuthStore`（Task 6 已引用）、`/auth/login|refresh|me`（经网关 → user-service）、`hasPermission`（含 `*:*`）
-- Produces: `useAuthStore`（`accessToken/user/permissions/isAuthenticated/isLoading` + `login/logout/hydrate/refreshAccessToken/hasPermission/hasAnyPermission`）、`PermissionGuard`、`(admin)` 路由守卫
+- Produces: `useAuthStore`（`accessToken/user/permissions/isAuthenticated/isLoading` + `login/logout/hydrate/refreshAccessToken/hasPermission/hasAnyPermission`）、`PermissionGuard`、`admin` 路由守卫
 
 - [ ] **Step 1: `stores/auth.ts`（移植既有，补 module 权限）**
 
@@ -1454,7 +1463,7 @@ export default function LoginPage() {
 }
 ```
 
-- [ ] **Step 3: `PermissionGuard` + `(admin)/layout.tsx`**
+- [ ] **Step 3: `PermissionGuard` + `admin/layout.tsx`**
 
 ```tsx
 // components/shared/permission-guard.tsx
@@ -1471,7 +1480,7 @@ export function PermissionGuard({ code, children }: { code: string; children: Re
 ```
 
 ```tsx
-// app/(admin)/layout.tsx
+// app/admin/layout.tsx
 "use client";
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -1559,15 +1568,16 @@ Expected: 通过（含 Task 6 的 client 测试——注意 client 测试 mock �
 - [ ] **Step 7: Commit**
 
 ```bash
-git add frontend/stores/auth.ts frontend/app/'(auth)'/login/page.tsx frontend/components/shared/permission-guard.tsx frontend/app/'(admin)'/layout.tsx frontend/components/admin/sidebar.tsx frontend/__tests__/stores/auth.test.ts
+git add frontend/stores/auth.ts frontend/app/'(auth)'/login/page.tsx frontend/components/shared/permission-guard.tsx frontend/app/'admin'/layout.tsx frontend/components/admin/sidebar.tsx frontend/__tests__/stores/auth.test.ts
 git commit -m "feat(frontend): auth store + 登录页 + 管理端权限守卫"
 ```
 
 ### Task 8: 商城商品列表页
 
 **Files:**
+- Delete: `frontend/app/page.tsx`（Task 5 占位页，改由本任务 `/` 商城首页取代）
 - Create: `frontend/app/(storefront)/layout.tsx`
-- Create: `frontend/app/(storefront)/page.tsx`
+- Create: `frontend/app/(storefront)/page.tsx`（URL `/`，取代 Task 5 的根占位页）
 - Create: `frontend/components/storefront/product-card.tsx`
 - Create: `frontend/lib/schemas/product.ts`（搜索参数校验，可后续复用于表单）
 - Test: `frontend/__tests__/components/storefront/product-card.test.tsx`
@@ -1766,7 +1776,7 @@ Expected: 列表/筛选/分页正常。
 - [ ] **Step 7: Commit**
 
 ```bash
-git add frontend/app/'(storefront)'/layout.tsx frontend/app/'(storefront)'/page.tsx frontend/components/storefront/product-card.tsx frontend/__tests__/components/storefront/product-card.test.tsx
+git add -A frontend/app/page.tsx frontend/app/'(storefront)'/layout.tsx frontend/app/'(storefront)'/page.tsx frontend/components/storefront/product-card.tsx frontend/__tests__/components/storefront/product-card.test.tsx
 git commit -m "feat(frontend): 商城商品列表 + 搜索/筛选/分页 + ProductCard"
 ```
 
@@ -2438,10 +2448,10 @@ git commit -m "feat(frontend): 我的订单列表 + 状态过滤"
 ### Task 13: 后台商品管理（列表 + 表单 + SKU 子表 + 启停）
 
 **Files:**
-- Create: `frontend/app/(admin)/page.tsx`（仪表板：重定向到商品）
-- Create: `frontend/app/(admin)/products/page.tsx`
-- Create: `frontend/app/(admin)/products/new/page.tsx`
-- Create: `frontend/app/(admin)/products/[id]/page.tsx`
+- Create: `frontend/app/admin/page.tsx`（仪表板：重定向到商品）
+- Create: `frontend/app/admin/products/page.tsx`
+- Create: `frontend/app/admin/products/new/page.tsx`
+- Create: `frontend/app/admin/products/[id]/page.tsx`
 - Create: `frontend/components/admin/sku-editor.tsx`
 - Create: `frontend/lib/schemas/spu.ts`（zod 对齐后端 `@Valid`）
 - Test: `frontend/__tests__/lib/schemas/spu.test.ts`
@@ -2480,7 +2490,7 @@ export const spuSchema = z.object({
 export type SpuFormValues = z.infer<typeof spuSchema>;
 ```
 
-- [ ] **Step 2: 商品列表 `(admin)/products/page.tsx`**
+- [ ] **Step 2: 商品列表 `admin/products/page.tsx`**
 
 ```tsx
 "use client";
@@ -2646,17 +2656,17 @@ Expected: 通过。列表可搜/筛/启停/删除；表单新建/编辑可用。
 - [ ] **Step 8: Commit**
 
 ```bash
-git add frontend/app/'(admin)'/page.tsx frontend/app/'(admin)'/products/page.tsx frontend/app/'(admin)'/products/new/page.tsx frontend/app/'(admin)'/products/'[id]'/page.tsx frontend/components/admin/sku-editor.tsx frontend/components/admin/spu-form.tsx frontend/lib/schemas/spu.ts frontend/__tests__/lib/schemas/spu.test.ts
+git add frontend/app/'admin'/page.tsx frontend/app/'admin'/products/page.tsx frontend/app/'admin'/products/new/page.tsx frontend/app/'admin'/products/'[id]'/page.tsx frontend/components/admin/sku-editor.tsx frontend/components/admin/spu-form.tsx frontend/lib/schemas/spu.ts frontend/__tests__/lib/schemas/spu.test.ts
 git commit -m "feat(frontend): 后台商品管理(列表/表单/SKU/启停)"
 ```
 
 ### Task 14: 后台分类树 + 品牌管理 + 库存查询
 
 **Files:**
-- Create: `frontend/app/(admin)/categories/page.tsx`
+- Create: `frontend/app/admin/categories/page.tsx`
 - Create: `frontend/components/admin/category-tree.tsx`
-- Create: `frontend/app/(admin)/brands/page.tsx`
-- Create: `frontend/app/(admin)/inventory/page.tsx`
+- Create: `frontend/app/admin/brands/page.tsx`
+- Create: `frontend/app/admin/inventory/page.tsx`
 - Create: `frontend/lib/schemas/admin.ts`（CategoryRequest/BrandRequest zod）
 - Test: `frontend/__tests__/components/admin/category-tree.test.tsx`
 
@@ -3054,15 +3064,15 @@ Expected: 通过。分类增删改、品牌 CRUD、库存查询可用。
 - [ ] **Step 8: Commit**
 
 ```bash
-git add frontend/app/'(admin)'/categories/page.tsx frontend/components/admin/category-tree.tsx frontend/app/'(admin)'/brands/page.tsx frontend/app/'(admin)'/inventory/page.tsx frontend/lib/schemas/admin.ts frontend/__tests__/components/admin/category-tree.test.tsx
+git add frontend/app/'admin'/categories/page.tsx frontend/components/admin/category-tree.tsx frontend/app/'admin'/brands/page.tsx frontend/app/'admin'/inventory/page.tsx frontend/lib/schemas/admin.ts frontend/__tests__/components/admin/category-tree.test.tsx
 git commit -m "feat(frontend): 后台分类树/品牌/库存查询"
 ```
 
 ### Task 15: 后台订单管理（内部端点 + 发货/退款）
 
 **Files:**
-- Create: `frontend/app/(admin)/orders/page.tsx`
-- Create: `frontend/app/(admin)/orders/[id]/page.tsx`
+- Create: `frontend/app/admin/orders/page.tsx`
+- Create: `frontend/app/admin/orders/[id]/page.tsx`
 - Create: `frontend/components/admin/order-table.tsx`
 - Test: `frontend/__tests__/lib/api/orders.test.ts`
 
@@ -3070,7 +3080,7 @@ git commit -m "feat(frontend): 后台分类树/品牌/库存查询"
 - Consumes: `adminOrdersApi.list/get/ship/refund`（`internalApi`，Task 6）、`OrderResponse.items`、`STATUS_LABEL`（Task 11 定义，可提取复用）
 - Produces: 全量订单列表（状态过滤 + 分页）、订单详情（发货/退款按钮）
 
-- [ ] **Step 1: 订单列表 `(admin)/orders/page.tsx`**
+- [ ] **Step 1: 订单列表 `admin/orders/page.tsx`**
 
 ```tsx
 "use client";
@@ -3140,7 +3150,7 @@ export default function AdminOrdersPage() {
 }
 ```
 
-- [ ] **Step 2: 订单详情 `(admin)/orders/[id]/page.tsx`**
+- [ ] **Step 2: 订单详情 `admin/orders/[id]/page.tsx`**
 
 ```tsx
 "use client";
@@ -3270,7 +3280,7 @@ Expected: 通过。管理员可看全量订单并对 PAID 单发货/退款。
 - [ ] **Step 7: Commit**
 
 ```bash
-git add frontend/app/'(admin)'/orders/page.tsx frontend/app/'(admin)'/orders/'[id]'/page.tsx frontend/components/admin/order-table.tsx frontend/__tests__/lib/api/orders.test.ts
+git add frontend/app/'admin'/orders/page.tsx frontend/app/'admin'/orders/'[id]'/page.tsx frontend/components/admin/order-table.tsx frontend/__tests__/lib/api/orders.test.ts
 git commit -m "feat(frontend): 后台订单管理(全量列表/发货/退款)"
 ```
 
@@ -3288,7 +3298,7 @@ git commit -m "feat(frontend): 后台订单管理(全量列表/发货/退款)"
 
 - [ ] **Step 1: 补组件/页面测试至覆盖率 ≥80%**
 
-对未覆盖分支（购物车页、结算页、订单列表、后台列表/表单、登录页、`(storefront)/layout` 顶栏、`(admin)/layout` 守卫）逐一补 RTL 测试（模式参照前序 Task 的测试）。Run: `cd frontend && npx vitest run --coverage` 直到 lines/functions/branches/statements ≥80%。
+对未覆盖分支（购物车页、结算页、订单列表、后台列表/表单、登录页、`(storefront)/layout` 顶栏、`admin/layout` 守卫）逐一补 RTL 测试（模式参照前序 Task 的测试）。Run: `cd frontend && npx vitest run --coverage` 直到 lines/functions/branches/statements ≥80%。
 
 - [ ] **Step 2: e2e 商城闭环 `e2e/storefront.spec.ts`**
 
