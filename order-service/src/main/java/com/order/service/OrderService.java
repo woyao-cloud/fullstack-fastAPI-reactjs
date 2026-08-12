@@ -139,6 +139,40 @@ public class OrderService {
                 .orElseThrow(() -> new IllegalArgumentException("订单不存在: " + orderId));
     }
 
+    public PageResponse<OrderResponse> listAllOrders(OrderStatus status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Order> p = (status == null)
+                ? orderRepository.findAll(pageable)
+                : orderRepository.findByStatus(status, pageable);
+        return new PageResponse<>(p.getContent().stream()
+                .map(o -> toResponse(o, orderItemRepository.findByOrderId(o.getId()))).toList(),
+                p.getTotalElements(), page, size);
+    }
+
+    public OrderResponse getOrderAdmin(UUID orderId) {
+        Order order = requireOrderById(orderId);
+        return toResponse(order, orderItemRepository.findByOrderId(orderId));
+    }
+
+    public void shipAdmin(UUID orderId) {
+        Order order = requireOrderById(orderId);
+        requireStatus(order, OrderStatus.PAID);
+        order.setStatus(OrderStatus.SHIPPED);
+    }
+
+    public void refundAdmin(UUID orderId) {
+        Order order = requireOrderById(orderId);
+        requireStatus(order, OrderStatus.PAID);   // 仅已支付可退
+        order.setStatus(OrderStatus.REFUNDING);
+        order.setStatus(OrderStatus.REFUNDED);    // 模拟立即退款成功
+        publishAfterCommit(OrderEvent.EventType.REFUNDED, order, itemsOf(orderId));
+    }
+
+    private Order requireOrderById(UUID orderId) {
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("订单不存在: " + orderId));
+    }
+
     private static OrderResponse toResponse(Order order, List<OrderItem> items) {
         return new OrderResponse(order.getId(), order.getOrderNo(), order.getStatus(),
                 order.getTotalAmount(), order.getPaidAt(), order.getClosedAt(),
