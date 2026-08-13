@@ -20,7 +20,14 @@ export default function CartPage() {
       setItems(r.data);
       setInitial(r.data.map((c) => c.skuId), r.data.map((c) => c.checked));
       setLoading(false);
-    }).catch(() => { setLoading(false); setNotAuthed(true); });
+    }).catch((e) => {
+      setLoading(false);
+      if ((e as { response?: { status?: number } })?.response?.status === 401) {
+        setNotAuthed(true);
+      } else {
+        toast.error(e instanceof Error ? e.message : "购物车加载失败");
+      }
+    });
   }, [setInitial]);
 
   const checked = items.filter((c) => checkedBySku[c.skuId]);
