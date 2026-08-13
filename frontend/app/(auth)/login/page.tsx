@@ -1,6 +1,6 @@
 "use client";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,7 +18,16 @@ const schema = z.object({
 type Form = z.infer<typeof schema>;
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const sp = useSearchParams();
   const login = useAuthStore((s) => s.login);
   const [loading, setLoading] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<Form>({ resolver: zodResolver(schema) });
@@ -28,7 +37,7 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password);
       toast.success("登录成功");
-      router.push("/admin");
+      router.push(sp.get("redirect") ?? "/admin");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "登录失败");
     } finally {
