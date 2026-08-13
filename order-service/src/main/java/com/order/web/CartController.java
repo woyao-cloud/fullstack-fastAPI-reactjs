@@ -1,6 +1,5 @@
 package com.order.web;
 
-import com.order.domain.entity.Cart;
 import com.order.service.CartService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +25,7 @@ public class CartController {
     }
 
     @GetMapping
-    public List<Cart> list() {
+    public List<CartService.CartItemResponse> list() {
         return cartService.list(userContext.currentUserId());
     }
 

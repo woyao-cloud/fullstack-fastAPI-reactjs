@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CartRepository extends JpaRepository<Cart, UUID> {
+    List<Cart> findByUserId(UUID userId);
     List<Cart> findByUserIdAndCheckedTrue(UUID userId);
     Optional<Cart> findByUserIdAndSkuId(UUID userId, UUID skuId);
     void deleteByUserIdAndSkuIdIn(UUID userId, Collection<UUID> skuIds);

@@ -11,7 +11,7 @@ export interface SpuCreateRequest { name: string; description?: string | null; c
 export interface CategoryRequest { name: string; slug: string; parentId?: string | null; sortOrder: number; icon?: string | null; isActive: boolean; }
 export interface BrandRequest { name: string; logoUrl?: string | null; description?: string | null; sortOrder: number; }
 export interface InventoryStock { skuId: string; quantity: number; frozen: number; available: number; }
-export interface CartItem { id: string; userId: string; skuId: string; quantity: number; checked: boolean; createdAt: string; updatedAt: string; }
+export interface CartItem { skuId: string; quantity: number; checked: boolean; productName: string; skuSpec: string; price: string; }
 export interface OrderItemResponse { skuId: string; productName: string; skuSpec: string; price: string; quantity: number; subtotal: string; }
 export interface OrderResponse { id: string; orderNo: string; status: OrderStatus; totalAmount: string; paidAt: string | null; closedAt: string | null; items: OrderItemResponse[]; }
 export interface CreateOrderRequest { lines: { skuId: string; quantity: number }[]; }
