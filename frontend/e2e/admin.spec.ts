@@ -2,8 +2,9 @@ import { test, expect } from "@playwright/test";
 
 // 前置: 本机已 `docker compose up`（网关 + 三服务 + user-service）并跑过
 // `scripts/test-data/load-test-data.sh`；且 user-service 中已有
-// `admin@example.com / password` 账号并具备 `order:manage` 权限
+// `admin@example.com / password` 账号并具备 `product:manage` + `order:manage` 权限
 // （参考 plan-fix ④：账号/权限需在 user-service 中补建并赋权）。
+// /admin 会重定向到 /admin/products（需 product:manage 才显示「商品管理」）。
 test("后台登录→商品列表→发货", async ({ page }) => {
   await page.goto("/admin");
   await page.waitForURL(/\/login/);

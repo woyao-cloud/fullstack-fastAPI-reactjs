@@ -2,12 +2,13 @@ import { test, expect } from "@playwright/test";
 
 // 前置: 本机已 `docker compose up`（网关 + 三服务 + user-service）并跑过
 // `scripts/test-data/load-test-data.sh`；且 user-service 中已有
-// `admin@example.com / password` 账号并具备 `order:manage` 权限
+// `admin@example.com / password` 账号并具备 `product:manage` + `order:manage` 权限
 // （参考 plan-fix ④：账号/权限需在 user-service 中补建并赋权）。
 test("浏览→加购→下单→支付→我的订单", async ({ page }) => {
   // 前置: 本机已 docker compose up（三服务+网关+user-service）+ load-test-data.sh
   await page.goto("/");
-  await expect(page.locator("h1, [data-testid=product-name]").first()).toBeVisible();
+  // 首页无 h1、商品名渲染在 CardTitle 内(非 data-testid) — 直接断言商品链接可见
+  await expect(page.locator("a[href^='/products/']").first()).toBeVisible();
   await page.locator("a[href^='/products/']").first().click();
   await page.getByRole("button", { name: "加入购物车" }).click();   // 未登录 → 跳登录
   await page.waitForURL(/\/login/);
