@@ -2457,6 +2457,8 @@ git commit -m "feat(frontend): 结算下单 + 订单详情(支付/取消/退款)
 
 ### Task 12: 我的订单列表
 
+> **plan-fix**：原 Step 2 任何失败都 `setData(null)` → `!data` 渲染**永久骨架屏**（含未登录 401）；且切 tab 有双 fetch 竞态（setPage(0) 与 fetch 分离，旧页号请求可后到覆盖）。修正：加 `notAuthed`（401→登录提示，镜像购物车/结算页）、`error`（非 401 失败显示错误文案而非永转骨架）、`cancelled` 竞态守卫。
+
 **Files:**
 - Create: `frontend/app/(storefront)/orders/page.tsx`
 - Create: `frontend/components/storefront/order-status-badge.tsx`
@@ -2488,6 +2490,8 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ordersApi } from "@/lib/api/orders";
 import type { OrderResponse, OrderStatus, PageResponse } from "@/types/api";
 import { OrderStatusBadge } from "@/components/storefront/order-status-badge";
@@ -2505,15 +2509,33 @@ const TABS: Array<{ key: OrderStatus | ""; label: string }> = [
 ];
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<OrderStatus | "">("");
   const [page, setPage] = useState(0);
   const [data, setData] = useState<PageResponse<OrderResponse> | null>(null);
+  const [notAuthed, setNotAuthed] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => { setPage(0); }, [tab]);
   useEffect(() => {
+    let cancelled = false;
+    setError(false);
     ordersApi.list(tab === "" ? undefined : tab, page, 10)
-      .then((r) => setData(r.data)).catch(() => setData(null));
+      .then((r) => { if (!cancelled) setData(r.data); })
+      .catch((e) => {
+        if (cancelled) return;
+        if ((e as { response?: { status?: number } })?.response?.status === 401) setNotAuthed(true);
+        else { setData(null); setError(true); toast.error(e instanceof Error ? e.message : "订单加载失败"); }
+      });
+    return () => { cancelled = true; };
   }, [tab, page]);
+
+  if (notAuthed) return (
+    <div className="container mx-auto p-6 text-center text-muted-foreground">
+      <p>登录后查看订单</p>
+      <Button className="mt-4" onClick={() => router.push("/login?redirect=/orders")}>去登录</Button>
+    </div>
+  );
 
   return (
     <div className="container mx-auto max-w-3xl space-y-4 p-6">
@@ -2526,7 +2548,7 @@ export default function OrdersPage() {
           </button>
         ))}
       </div>
-      {!data ? <Skeleton className="h-40" /> : (
+      {error ? <p className="text-muted-foreground">订单加载失败，请稍后重试</p> : !data ? <Skeleton className="h-40" /> : (
         <div className="space-y-3">
           {data.items.map((o) => (
             <Link key={o.id} href={`/orders/${o.id}`} className="flex items-center justify-between rounded border p-3 hover:bg-muted/50">
