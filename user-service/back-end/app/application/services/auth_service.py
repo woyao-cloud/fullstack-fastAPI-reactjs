@@ -62,7 +62,9 @@ class AuthService:
         user.last_login_at = datetime.now(UTC).isoformat()
         await self.db.commit()
         return TokenResponse(
-            access_token=create_access_token(user.id),
+            access_token=create_access_token(
+                user.id, user.email, sorted(await user.permission_codes())
+            ),
             refresh_token=create_refresh_token(user.id),
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
@@ -78,7 +80,9 @@ class AuthService:
         if user is None or not user.is_active:
             raise AuthError("用户不存在或已禁用")
         return TokenResponse(
-            access_token=create_access_token(user.id),
+            access_token=create_access_token(
+                user.id, user.email, sorted(await user.permission_codes())
+            ),
             refresh_token=create_refresh_token(user.id),
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )

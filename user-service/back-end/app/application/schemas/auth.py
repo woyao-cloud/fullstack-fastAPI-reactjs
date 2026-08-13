@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -27,3 +29,10 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class MeResponse(BaseModel):
+    id: uuid.UUID
+    email: EmailStr
+    name: str | None = None
+    permissions: list[str]

@@ -29,7 +29,12 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def _create_token(subject: str | uuid.UUID, expires: timedelta, token_type: str) -> str:
+def _create_token(
+    subject: str | uuid.UUID,
+    expires: timedelta,
+    token_type: str,
+    claims: dict[str, Any] | None = None,
+) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(subject),
@@ -38,12 +43,17 @@ def _create_token(subject: str | uuid.UUID, expires: timedelta, token_type: str)
         "exp": now + expires,
         "jti": uuid.uuid4().hex,
     }
+    if claims:
+        payload.update(claims)
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def create_access_token(user_id: uuid.UUID) -> str:
+def create_access_token(user_id: uuid.UUID, email: str, permissions: list[str]) -> str:
     return _create_token(
-        user_id, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "access"
+        user_id,
+        timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "access",
+        {"email": email, "permissions": permissions},
     )
 
 

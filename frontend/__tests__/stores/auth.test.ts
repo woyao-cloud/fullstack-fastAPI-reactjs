@@ -26,7 +26,7 @@ describe("auth store", () => {
     expect(useAuthStore.getState().hasPermission("inventory:manage")).toBe(false);
   });
 
-  it("login stores token and calls /auth/me", async () => {
+  it("login stores token and calls /auth/me with Bearer header", async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "a1", refresh_token: "r1" }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "u1", email: "a@b.c", permissions: ["order:manage"] }) });
@@ -35,5 +35,6 @@ describe("auth store", () => {
     expect(s.isAuthenticated).toBe(true);
     expect(s.permissions).toContain("order:manage");
     expect(localStorage.getItem("refresh_token")).toBe("r1");
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe("Bearer a1");
   });
 });

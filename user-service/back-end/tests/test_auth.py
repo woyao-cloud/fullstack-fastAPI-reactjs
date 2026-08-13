@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from app.core.security import decode_token
+
 pytestmark = pytest.mark.asyncio
 
 REGISTER_PAYLOAD = {
@@ -91,4 +93,40 @@ async def test_refresh_with_invalid_token(client):
 
 async def test_protected_without_token(client):
     resp = await client.get("/api/v1/users")
+    assert resp.status_code == 401
+
+
+async def test_access_token_contains_email_and_permissions(client):
+    await client.post("/api/v1/auth/register", json=REGISTER_PAYLOAD)
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@test.com", "password": "Alice@1234"},
+    )
+    assert resp.status_code == 200, resp.text
+    payload = decode_token(resp.json()["access_token"])
+    assert payload["email"] == "alice@test.com"
+    assert "permissions" in payload
+    assert isinstance(payload["permissions"], list)
+
+
+async def test_me_returns_user_and_permissions(client):
+    await client.post("/api/v1/auth/register", json=REGISTER_PAYLOAD)
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@test.com", "password": "Alice@1234"},
+    )
+    token = login.json()["access_token"]
+    resp = await client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["email"] == "alice@test.com"
+    assert data["name"] == "Alice Wang"
+    assert isinstance(data["permissions"], list)
+    assert data["id"]
+
+
+async def test_me_without_token_unauthorized(client):
+    resp = await client.get("/api/v1/auth/me")
     assert resp.status_code == 401
