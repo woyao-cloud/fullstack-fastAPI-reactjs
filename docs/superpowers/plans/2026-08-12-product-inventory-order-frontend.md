@@ -1298,7 +1298,13 @@ git commit -m "feat(frontend): API 层 + DTO 类型 + 401 并发刷新"
 - Consumes: `useAuthStore`（Task 6 已引用）、`/auth/login|refresh|me`（经网关 → user-service）、`hasPermission`（含 `*:*`）
 - Produces: `useAuthStore`（`accessToken/user/permissions/isAuthenticated/isLoading` + `login/logout/hydrate/refreshAccessToken/hasPermission/hasAnyPermission`）、`PermissionGuard`、`admin` 路由守卫
 
-- [ ] **Step 1: `stores/auth.ts`（移植既有，补 module 权限）**
+**后端前置（plan-fix `b5c3a511` 后核验，缺失即登录/管理端全断）:** user-service 当前签发 access token 仅含 `sub/type/iat/exp/jti`，网关 `JwtParser` 读取的 `email`/`permissions` claim 恒为空 → `X-User-Permissions` 为空 → `AdminInternalFilter` 对所有 `/internal/**` 返回 403（管理端死）；且 user-service 无 `/auth/me` 路由。修复（backend 前置，随本 Task 一并实施）：
+1. `user-service/back-end/app/core/security.py`：`create_access_token(user_id, email, permissions)` 在 payload 增加 `"email"` 与 `"permissions"` claim（`_create_token` 加可选 claims 参数）。
+2. `user-service/back-end/app/application/services/auth_service.py`：`login()`/`refresh()` 调 `create_access_token(user.id, user.email, list(await user.permission_codes()))`。
+3. 新增 `GET /api/v1/auth/me`（`auth.py`，`response_model=MeResponse`，`Depends(get_current_user)`）：返回 `{id, email, name: user.full_name 或 None, permissions: list(await user.permission_codes())}`。`MeResponse` schema 建于 `app/application/schemas/auth.py`。
+4. 测试：`tests/test_auth.py` 补 ①登录后 access token 含 `permissions`/`email` claim（`decode_token` 断言）②`GET /auth/me` 带 Bearer 返回 id/email/name/permissions ③无 token 401。
+
+- [ ] **Step 1: `stores/auth.ts`（移植既有，补 module 权限；`/auth/me` 调用必须带 `Authorization: Bearer <accessToken>` 头）**
 
 ```ts
 import { create } from "zustand";
@@ -1323,10 +1329,10 @@ interface AuthState {
   hasAnyPermission: (codes: string[]) => boolean;
 }
 
-async function apiCall<T>(url: string, init?: { method?: string; body?: unknown }): Promise<T> {
+async function apiCall<T>(url: string, init?: { method?: string; body?: unknown; token?: string }): Promise<T> {
   const res = await fetch(url, {
     method: init?.method ?? "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}) },
     body: init?.body ? JSON.stringify(init.body) : undefined,
   });
   if (!res.ok) {
@@ -1346,7 +1352,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email, password) => {
     const data = await apiCall<TokenResponse>("/api/v1/auth/login", { method: "POST", body: { email, password } });
     localStorage.setItem(REFRESH_KEY, data.refresh_token);
-    const me = await apiCall<{ permissions: string[] } & UserOut>("/api/v1/auth/me", { method: "GET" });
+    const me = await apiCall<{ permissions: string[] } & UserOut>("/api/v1/auth/me", { method: "GET", token: data.access_token });
     set({ accessToken: data.access_token, user: me, permissions: me.permissions, isAuthenticated: true, isLoading: false });
   },
 
@@ -1361,7 +1367,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const t = await get().refreshAccessToken();
       if (!t) return;
-      const me = await apiCall<{ permissions: string[] } & UserOut>("/api/v1/auth/me", { method: "GET" });
+      const me = await apiCall<{ permissions: string[] } & UserOut>("/api/v1/auth/me", { method: "GET", token: get().accessToken ?? undefined });
       set({ user: me, permissions: me.permissions, isAuthenticated: true, isLoading: false });
     } catch {
       get().logout();
@@ -1542,7 +1548,7 @@ describe("auth store", () => {
     expect(useAuthStore.getState().hasPermission("inventory:manage")).toBe(false);
   });
 
-  it("login stores token and calls /auth/me", async () => {
+  it("login stores token and calls /auth/me with Bearer header", async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "a1", refresh_token: "r1" }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "u1", email: "a@b.c", permissions: ["order:manage"] }) });
@@ -1551,6 +1557,7 @@ describe("auth store", () => {
     expect(s.isAuthenticated).toBe(true);
     expect(s.permissions).toContain("order:manage");
     expect(localStorage.getItem("refresh_token")).toBe("r1");
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe("Bearer a1");
   });
 });
 ```
