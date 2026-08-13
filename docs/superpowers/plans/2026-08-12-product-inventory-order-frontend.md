@@ -1969,17 +1969,147 @@ git commit -m "feat(frontend): 商品详情 + 规格选择 + 库存懒加载 + �
 
 ### Task 10: 购物车页
 
+> **后端前置（plan-fix）**：原方案购物车页用 `productsApi.detail(c.skuId)` 取每行商品名/价格，但 `CartItem.skuId` 是 SKU id，`GET /products/{id}` 按 SPU id 查询——按 SKU id 查必 404，购物车行将无名称/价格。且 `CartService.list()` 目前只返回 `checked=true` 行，与前端 `checkedBySku` 纯客户端勾选模型冲突（Task 11 结算页按 `checkedBySku` 客户端过滤，假定 list 返回全部行）。
+>
+> 修正（沿用 Task 2/9 既有模式，不新增安全暴露面）：**order-service 的 cart list 返回自描述行**——`CartService.list()` 改查 `findByUserId`（全部行），经既有 `ProductClient.batchSkus`（`POST /internal/skus/batch`，与 `OrderService.createOrder` 同款用法）解析商品名/规格/价格，返回 `CartItemResponse(skuId, quantity, checked, productName, skuSpec, price)`。前端不再调用 `productsApi.detail`。勾选态保持纯客户端（结算页直接 POST lines），无后端 toggle 端点。
+
 **Files:**
+- Modify: `order-service/src/main/java/com/order/service/CartService.java`（list 返回自描述行）
+- Modify: `order-service/src/main/java/com/order/web/CartController.java`（返回类型）
+- Modify: `order-service/src/main/java/com/order/repository/CartRepository.java`（加 findByUserId）
+- Modify: `order-service/src/test/java/com/order/service/CartServiceTest.java`（mock ProductClient + 断言富化）
+- Modify: `frontend/types/api.ts`（`CartItem` 替换为新响应形状）
 - Create: `frontend/app/(storefront)/cart/page.tsx`
 - Create: `frontend/stores/cart.ts`（勾选/数量 UI 态）
 - Create: `frontend/components/storefront/cart-line.tsx`
 - Test: `frontend/__tests__/stores/cart.test.ts`
 
 **Interfaces:**
-- Consumes: `cartApi.list/add/remove`、`productsApi.detail`（每行商品名/价格）、`CartItem`（checked 仅作初始值）
-- Produces: `useCartStore`（`checkedBySku: Record<string, boolean>`、`toggle/toggleAll`）、购物车页
+- Consumes: `cartApi.list/add/remove`、`CartItem`（新形状 `{ skuId, quantity, checked, productName, skuSpec, price }`，checked 仅作初始值）、`ProductClient.batchSkus` → `SkuSnapshot(id, productName, skuSpec, price)`
+- Produces: `CartService.list() → List<CartItemResponse>`、`useCartStore`（`checkedBySku: Record<string, boolean>`、`toggle/toggleAll`）、购物车页
+- **后端契约变更（影响 Task 11）**：`GET /api/v1/cart` 现在返回 `[{ skuId, quantity, checked, productName, skuSpec, price }]`（无 id/userId/createdAt/updatedAt）。Task 11 结算页用 `c.skuId/c.quantity/c.checked`，不受影响。
 
-- [ ] **Step 1: `stores/cart.ts`（勾选态 UI store）**
+- [ ] **Step 1（后端）: `CartService.list()` 返回自描述行**
+
+Modify `order-service/src/main/java/com/order/service/CartService.java`:
+
+```java
+// 构造器新增依赖
+public CartService(CartRepository cartRepository, ProductClient productClient) {
+    this.cartRepository = cartRepository;
+    this.productClient = productClient;
+}
+```
+
+```java
+// list 返回全部行 + 富化（不再是只查 checked）
+@Transactional(readOnly = true)
+public List<CartItemResponse> list(UUID userId) {
+    List<Cart> carts = cartRepository.findByUserId(userId);
+    if (carts.isEmpty()) { return List.of(); }
+    List<UUID> skuIds = carts.stream().map(Cart::getSkuId).toList();
+    Map<UUID, SkuSnapshot> byId = productClient.batchSkus(skuIds).stream()
+            .collect(Collectors.toMap(SkuSnapshot::id, s -> s));
+    return carts.stream().map(c -> {
+        SkuSnapshot s = byId.get(c.getSkuId());
+        return new CartItemResponse(c.getSkuId(), c.getQuantity(), c.isChecked(),
+                s != null ? s.productName() : null,
+                s != null ? s.skuSpec() : null,
+                s != null ? s.price() : null);
+    }).toList();
+}
+
+public record CartItemResponse(UUID skuId, int quantity, boolean checked,
+        String productName, String skuSpec, java.math.BigDecimal price) {}
+```
+
+- [ ] **Step 2（后端）: `CartRepository` + `CartController` 适配**
+
+Add to `order-service/src/main/java/com/order/repository/CartRepository.java`:
+
+```java
+List<Cart> findByUserId(UUID userId);
+```
+
+`order-service/src/main/java/com/order/web/CartController.java` 的 `list()` 返回类型改为：
+
+```java
+@GetMapping
+public List<CartService.CartItemResponse> list() {
+    return cartService.list(userContext.currentUserId());
+}
+```
+
+- [ ] **Step 3（后端）: 更新 `CartServiceTest` + 跑后端测试**
+
+Update `order-service/src/test/java/com/order/service/CartServiceTest.java`（构造器多一个参数，需 mock；新增 import：`java.util.List`、`java.math.BigDecimal`、`com.order.client.ProductClient`、`com.order.client.SkuSnapshot`）：
+
+```java
+@ExtendWith(MockitoExtension.class)
+class CartServiceTest {
+    @Mock CartRepository repo;
+    @Mock ProductClient productClient;
+    CartService service;
+
+    @BeforeEach
+    void setUp() { service = new CartService(repo, productClient); }
+
+    @Test
+    void shouldAddAndAccumulateQuantity() {
+        UUID userId = UUID.randomUUID(), skuId = UUID.randomUUID();
+        Cart existing = new Cart(); existing.setQuantity(1);
+        when(repo.findByUserIdAndSkuId(userId, skuId)).thenReturn(Optional.of(existing));
+
+        service.add(userId, new CartService.AddItemRequest(skuId, 2));
+
+        assertThat(existing.getQuantity()).isEqualTo(3);
+    }
+
+    @Test
+    void listReturnsAllRowsEnrichedWithProductInfo() {
+        UUID userId = UUID.randomUUID(), skuId = UUID.randomUUID();
+        Cart c = new Cart();
+        c.setUserId(userId); c.setSkuId(skuId); c.setQuantity(2); c.setChecked(true);
+        when(repo.findByUserId(userId)).thenReturn(List.of(c));
+        when(productClient.batchSkus(List.of(skuId)))
+                .thenReturn(List.of(new SkuSnapshot(skuId, "测试商品", "{\"颜色\":\"红\"}", new BigDecimal("9.90"))));
+
+        List<CartService.CartItemResponse> rows = service.list(userId);
+
+        assertThat(rows).hasSize(1);
+        CartService.CartItemResponse row = rows.get(0);
+        assertThat(row.skuId()).isEqualTo(skuId);
+        assertThat(row.quantity()).isEqualTo(2);
+        assertThat(row.checked()).isTrue();
+        assertThat(row.productName()).isEqualTo("测试商品");
+        assertThat(row.price()).isEqualByComparingTo("9.90");
+    }
+
+    @Test
+    void listReturnsEmptyWhenNoRows() {
+        when(repo.findByUserId(UUID.randomUUID())).thenReturn(List.of());
+        assertThat(service.list(UUID.randomUUID())).isEmpty();
+    }
+}
+```
+
+Run（在 `order-service/` 下）:
+```bash
+mvn -q test
+```
+Expected: 通过。
+
+- [ ] **Step 4（前端）: 替换 `CartItem` 类型**
+
+Modify `frontend/types/api.ts`:
+
+```ts
+export interface CartItem { skuId: string; quantity: number; checked: boolean; productName: string; skuSpec: string; price: string; }
+```
+
+（原 `id/userId/createdAt/updatedAt` 字段删除——新契约不含；仅 `cart.ts` 引用此类型，`c.skuId/c.quantity/c.checked` 用法不变。）
+
+- [ ] **Step 5: `stores/cart.ts`（勾选态 UI store）**
 
 ```ts
 import { create } from "zustand";
@@ -2008,7 +2138,7 @@ export const useCartStore = create<CartUiState>((set) => ({
 }));
 ```
 
-- [ ] **Step 2: 购物车页 `app/(storefront)/cart/page.tsx`**
+- [ ] **Step 6: 购物车页 `app/(storefront)/cart/page.tsx`**
 
 ```tsx
 "use client";
@@ -2016,9 +2146,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cartApi } from "@/lib/api/cart";
-import { productsApi } from "@/lib/api/products";
 import { useCartStore } from "@/stores/cart";
-import type { CartItem, SpuResponse } from "@/types/api";
+import type { CartItem } from "@/types/api";
 import { CartLine } from "@/components/storefront/cart-line";
 import { Button } from "@/components/ui/button";
 
@@ -2026,26 +2155,19 @@ export default function CartPage() {
   const router = useRouter();
   const { checkedBySku, setInitial, toggle, toggleAll } = useCartStore();
   const [items, setItems] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState<Record<string, SpuResponse>>({});
   const [loading, setLoading] = useState(true);
+  const [notAuthed, setNotAuthed] = useState(false);
 
   useEffect(() => {
-    cartApi.list().then(async (r) => {
+    cartApi.list().then((r) => {
       setItems(r.data);
       setInitial(r.data.map((c) => c.skuId), r.data.map((c) => c.checked));
-      const map: Record<string, SpuResponse> = {};
-      await Promise.all(r.data.map((c) => productsApi.detail(c.skuId).then((p) => { map[c.skuId] = p.data; }).catch(() => {})));
-      setProducts(map);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { setLoading(false); setNotAuthed(true); });
   }, [setInitial]);
 
   const checked = items.filter((c) => checkedBySku[c.skuId]);
-  const total = checked.reduce((sum, c) => {
-    const p = products[c.skuId];
-    const sku = p?.skus.find((s) => s.id === c.skuId);
-    return sum + (sku ? Number(sku.price) * c.quantity : 0);
-  }, 0);
+  const total = checked.reduce((sum, c) => sum + Number(c.price) * c.quantity, 0);
 
   const remove = async (skuId: string) => {
     await cartApi.remove(skuId);
@@ -2058,6 +2180,12 @@ export default function CartPage() {
   };
 
   if (loading) return <div className="container mx-auto p-6 text-muted-foreground">加载中…</div>;
+  if (notAuthed) return (
+    <div className="container mx-auto p-6 text-center text-muted-foreground">
+      <p>登录后查看购物车</p>
+      <Button className="mt-4" onClick={() => router.push("/login?redirect=/cart")}>去登录</Button>
+    </div>
+  );
   return (
     <div className="container mx-auto max-w-3xl space-y-4 p-6">
       <h1 className="text-xl font-semibold">购物车</h1>
@@ -2067,7 +2195,7 @@ export default function CartPage() {
         全选
       </label>
       {items.map((c) => (
-        <CartLine key={c.skuId} item={c} product={products[c.skuId]} checked={!!checkedBySku[c.skuId]}
+        <CartLine key={c.skuId} item={c} checked={!!checkedBySku[c.skuId]}
           onToggle={() => toggle(c.skuId)} onRemove={() => remove(c.skuId)} />
       ))}
       {items.length === 0 && <p className="text-muted-foreground">购物车是空的</p>}
@@ -2080,25 +2208,23 @@ export default function CartPage() {
 }
 ```
 
-- [ ] **Step 3: `cart-line.tsx`**
+- [ ] **Step 7: `cart-line.tsx`**
 
 ```tsx
 "use client";
-import { cartApi } from "@/lib/api/cart";
-import type { CartItem, SpuResponse } from "@/types/api";
+import type { CartItem } from "@/types/api";
 import { Button } from "@/components/ui/button";
 
-export function CartLine({ item, product, checked, onToggle, onRemove }: {
-  item: CartItem; product?: SpuResponse; checked: boolean; onToggle: () => void; onRemove: () => void;
+export function CartLine({ item, checked, onToggle, onRemove }: {
+  item: CartItem; checked: boolean; onToggle: () => void; onRemove: () => void;
 }) {
-  const sku = product?.skus.find((s) => s.id === item.skuId);
   return (
     <div className="flex items-center gap-4 rounded border p-3">
       <input type="checkbox" checked={checked} onChange={onToggle} />
       <div className="flex-1">
-        <p className="font-medium">{product?.name ?? "…"}</p>
+        <p className="font-medium">{item.productName || "…"}</p>
         <p className="text-sm text-muted-foreground">
-          {sku ? `${Object.values(sku.specs).join(" / ") || "默认规格"} · ¥${Number(sku.price).toFixed(2)} × ${item.quantity}` : ""}
+          {item.skuSpec ? `${item.skuSpec} · ¥${Number(item.price).toFixed(2)} × ${item.quantity}` : ""}
         </p>
       </div>
       <Button variant="ghost" size="sm" onClick={onRemove}>删除</Button>
@@ -2107,7 +2233,7 @@ export function CartLine({ item, product, checked, onToggle, onRemove }: {
 }
 ```
 
-- [ ] **Step 4: 写失败测试 `cart.test.ts`**
+- [ ] **Step 8: 写失败测试 `cart.test.ts`**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -2130,21 +2256,21 @@ describe("cart store", () => {
 });
 ```
 
-- [ ] **Step 5: 运行确认失败**
+- [ ] **Step 9: 运行确认失败**
 
 Run: `cd frontend && npx vitest run __tests__/stores/cart.test.ts`
 Expected: 失败（store 不存在）。
 
-- [ ] **Step 6: 运行通过 + 冒烟**
+- [ ] **Step 10: 运行通过 + 冒烟**
 
-Run: `cd frontend && npx vitest run`
-Expected: 通过。勾选/改量/删除/合计正确。
+Run: `cd frontend && npx vitest run && npx tsc --noEmit`
+Expected: 通过。勾选/删除/合计正确，行显示商品名/规格/价格。
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add frontend/app/'(storefront)'/cart/page.tsx frontend/stores/cart.ts frontend/components/storefront/cart-line.tsx frontend/__tests__/stores/cart.test.ts
-git commit -m "feat(frontend): 购物车勾选/删除/合计"
+git add order-service/src/main/java/com/order/service/CartService.java order-service/src/main/java/com/order/web/CartController.java order-service/src/main/java/com/order/repository/CartRepository.java order-service/src/test/java/com/order/service/CartServiceTest.java frontend/types/api.ts frontend/app/'(storefront)'/cart/page.tsx frontend/stores/cart.ts frontend/components/storefront/cart-line.tsx frontend/__tests__/stores/cart.test.ts
+git commit -m "feat: 购物车行自描述(商品名/规格/价格) + 勾选/删除/合计"
 ```
 
 ### Task 11: 结算 + 下单 + 订单详情（支付/取消/退款）
