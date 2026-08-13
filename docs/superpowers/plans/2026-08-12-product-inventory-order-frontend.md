@@ -2275,13 +2275,15 @@ git commit -m "feat: 购物车行自描述(商品名/规格/价格) + 勾选/删
 
 ### Task 11: 结算 + 下单 + 订单详情（支付/取消/退款）
 
+> **plan-fix**：Task 10 已把 `CartItem` 富化为 `{ skuId, quantity, checked, productName, skuSpec, price }`。结算页明细不再渲染裸 `SKU {skuId}`，改用 `productName/skuSpec/price`（与购物车行一致）；`checkout.test.tsx` 的 mock 数据随之换成新形状并断言商品名。
+
 **Files:**
 - Create: `frontend/app/(storefront)/checkout/page.tsx`
 - Create: `frontend/app/(storefront)/orders/[id]/page.tsx`
 - Test: `frontend/__tests__/app/checkout.test.tsx`
 
 **Interfaces:**
-- Consumes: `useCartStore.checkedBySku`、`cartApi.list`、`ordersApi.create(lines)/get/pay/cancel/refund`、`CreateOrderRequest`（行数≤50、数量1-999、去重）、`OrderResponse.items`
+- Consumes: `useCartStore.checkedBySku`、`cartApi.list`、`ordersApi.create(lines)/get/pay/cancel/refund`、`CreateOrderRequest`（行数≤50、数量1-999、去重）、`OrderResponse.items`、`CartItem`（新形状含 productName/skuSpec/price）
 - Produces: 结算页（提交 `lines` = 勾选行）、订单详情页（状态徽章 + 明细 + 按状态操作按钮）
 
 - [ ] **Step 1: 结算页 `checkout/page.tsx`**
@@ -2327,7 +2329,12 @@ export default function CheckoutPage() {
   return (
     <div className="container mx-auto max-w-2xl space-y-4 p-6">
       <h1 className="text-xl font-semibold">确认订单</h1>
-      {items.map((c) => <p key={c.skuId} className="text-sm border-b py-2">SKU {c.skuId} × {c.quantity}</p>)}
+      {items.map((c) => (
+        <div key={c.skuId} className="border-b py-2 text-sm">
+          <p className="font-medium">{c.productName || "…"}</p>
+          <p className="text-muted-foreground">{c.skuSpec ? `${c.skuSpec} · ` : ""}¥{Number(c.price).toFixed(2)} × {c.quantity}</p>
+        </div>
+      ))}
       {items.length === 0 && <p className="text-muted-foreground">没有已勾选的商品</p>}
       <Button onClick={submit} disabled={submitting || items.length === 0}>
         {submitting ? "提交中…" : "提交订单"}
@@ -2418,12 +2425,12 @@ describe("CheckoutPage", () => {
     const create = vi.fn().mockResolvedValue({ data: { id: "o1" } });
     (ordersApi.create as unknown as ReturnType<typeof vi.fn>).mockImplementation(create);
     (cartApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [{ id: "c1", skuId: "s1", quantity: 2, checked: true }],
+      data: [{ skuId: "s1", quantity: 2, checked: true, productName: "测试商品", skuSpec: "默认规格", price: "9.90" }],
     });
     useCartStore.setState({ checkedBySku: { s1: true } });
 
     render(<CheckoutPage />);
-    await waitFor(() => expect(screen.getByText(/SKU s1 × 2/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/测试商品/)).toBeInTheDocument());
     fireEvent.click(screen.getByText("提交订单"));
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({ lines: [{ skuId: "s1", quantity: 2 }] }));
