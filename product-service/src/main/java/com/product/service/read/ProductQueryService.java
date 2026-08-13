@@ -66,7 +66,17 @@ public class ProductQueryService {
         Specification<Spu> spec = (root, q, cb) -> {
             q.distinct(true); // skus 隐式 join 去重，防止同 SPU 多 SKU 匹配时翻页重复
             List<Predicate> ps = new ArrayList<>();
-            ps.add(cb.equal(root.get("status"), SpuStatus.active));
+            // 状态过滤: null/空→active(商城默认); "all"→不过滤(后台全部); 否则按值
+            String statusRaw = req.status();
+            SpuStatus status = null;
+            if (statusRaw == null || statusRaw.isBlank() || "active".equalsIgnoreCase(statusRaw)) {
+                status = SpuStatus.active;
+            } else if (!"all".equalsIgnoreCase(statusRaw)) {
+                status = SpuStatus.valueOf(statusRaw.toLowerCase());
+            }
+            if (status != null) {
+                ps.add(cb.equal(root.get("status"), status));
+            }
             if (req.q() != null && !req.q().isBlank()) {
                 ps.add(cb.like(cb.lower(root.get("name")), "%" + req.q().toLowerCase() + "%"));
             }

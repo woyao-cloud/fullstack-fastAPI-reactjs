@@ -40,7 +40,7 @@ class ProductQueryServiceTest {
 
     @Test
     void shouldSearchByName() {
-        var req = new ProductSearchRequest("iPhone", null, null, null, null, null, 0, 10);
+        var req = new ProductSearchRequest("iPhone", null, null, null, null, null, null, 0, 10);
         when(spuRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(newActiveSpu()), PageRequest.of(0, 10), 1));
         var result = service.search(req);

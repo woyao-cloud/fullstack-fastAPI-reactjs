@@ -43,7 +43,7 @@ class SpuWriteServiceTest {
         var req = new SpuCreateRequest("iPhone 16", "desc", category.getId(), null,
                 null, List.of(), List.of(), List.of("热卖"),
                 List.of(new SkuRequest(Map.of("颜色", "黑"), new BigDecimal("5999.00"),
-                        "SKU-001", null, null, null)));
+                        "SKU-001", null, null, null, null)));
         when(categoryRepository.findById(category.getId())).thenReturn(Optional.of(category));
         when(spuRepository.save(any())).thenAnswer(inv -> { Spu s = inv.getArgument(0); s.setId(UUID.randomUUID()); return s; });
         when(skuRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -72,7 +72,7 @@ class SpuWriteServiceTest {
         var req = new SpuCreateRequest("iPhone 16", "desc", category.getId(), null,
                 null, images, specsTemplate, List.of("热卖"),
                 List.of(new SkuRequest(Map.of("颜色", "黑"), new BigDecimal("5999.00"),
-                        "SKU-001", null, null, images)));
+                        "SKU-001", null, null, images, null)));
         when(categoryRepository.findById(category.getId())).thenReturn(Optional.of(category));
         when(spuRepository.save(any())).thenAnswer(inv -> { Spu s = inv.getArgument(0); s.setId(UUID.randomUUID()); return s; });
         when(skuRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));

@@ -1,7 +1,7 @@
 import { api } from "./client";
 import type { PageResponse, SpuCreateRequest, SpuResponse, SpuStatus } from "@/types/api";
 
-export interface ProductSearchParams { q?: string; category?: string; brand?: string; minPrice?: string; maxPrice?: string; sort?: string; page?: number; size?: number; }
+export interface ProductSearchParams { q?: string; category?: string; brand?: string; minPrice?: string; maxPrice?: string; sort?: string; status?: string; page?: number; size?: number; }
 
 export const productsApi = {
   search: (params: ProductSearchParams) =>

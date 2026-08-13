@@ -105,7 +105,7 @@ public class SpuWriteService {
         sku.setBarCode(r.barCode());
         sku.setWeight(r.weight());
         sku.setImages(toJsonArray(r.images()));
-        sku.setActive(true);
+        sku.setActive(r.isActive() == null || r.isActive());
         return sku;
     }
 

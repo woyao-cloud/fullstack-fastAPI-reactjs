@@ -7,6 +7,7 @@ public record ProductSearchRequest(
         String minPrice,
         String maxPrice,
         String sort,
+        String status,
         int page,
         int size
 ) {

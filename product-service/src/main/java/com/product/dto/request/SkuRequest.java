@@ -15,5 +15,6 @@ public record SkuRequest(
         @NotBlank @Size(max = 50) String skuCode,
         String barCode,
         BigDecimal weight,
-        List<String> images
+        List<String> images,
+        Boolean isActive
 ) {}
