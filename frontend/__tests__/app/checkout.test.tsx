@@ -5,7 +5,9 @@ import { cartApi } from "@/lib/api/cart";
 import { ordersApi } from "@/lib/api/orders";
 import { useCartStore } from "@/stores/cart";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("@/lib/api/cart", () => ({ cartApi: { list: vi.fn() } }));
 vi.mock("@/lib/api/orders", () => ({ ordersApi: { create: vi.fn() } }));
 
@@ -23,5 +25,6 @@ describe("CheckoutPage", () => {
     fireEvent.click(screen.getByText("提交订单"));
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({ lines: [{ skuId: "s1", quantity: 2 }] }));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/orders/o1"));
   });
 });

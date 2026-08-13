@@ -13,10 +13,14 @@ export default function CheckoutPage() {
   const { checkedBySku } = useCartStore();
   const [items, setItems] = useState<CartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [notAuthed, setNotAuthed] = useState(false);
 
   useEffect(() => {
-    cartApi.list().then((r) => setItems(r.data.filter((c) => checkedBySku[c.skuId])))
-      .catch(() => setItems([]));
+    cartApi.list().then((r) => setItems(r.data.filter((c) => checkedBySku[c.skuId] ?? c.checked)))
+      .catch((e) => {
+        if ((e as { response?: { status?: number } })?.response?.status === 401) setNotAuthed(true);
+        else toast.error(e instanceof Error ? e.message : "购物车加载失败");
+      });
   }, [checkedBySku]);
 
   const submit = async () => {
@@ -35,6 +39,12 @@ export default function CheckoutPage() {
     }
   };
 
+  if (notAuthed) return (
+    <div className="container mx-auto p-6 text-center text-muted-foreground">
+      <p>登录后查看购物车</p>
+      <Button className="mt-4" onClick={() => router.push("/login?redirect=/checkout")}>去登录</Button>
+    </div>
+  );
   return (
     <div className="container mx-auto max-w-2xl space-y-4 p-6">
       <h1 className="text-xl font-semibold">确认订单</h1>
