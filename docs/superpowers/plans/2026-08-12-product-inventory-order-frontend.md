@@ -3520,10 +3520,17 @@ git commit -m "feat(frontend): 后台订单管理(全量列表/发货/退款)"
 
 ### Task 16: 测试补全 + 覆盖率 + e2e 关键闭环
 
+> **plan-fix（环境/工具链校准，调度前亲验）**：
+> ① `@vitest/coverage-v8` 未安装（package.json 仅 vitest；vitest.config.ts 已配 80% 阈值）→ 覆盖率闸门不可跑。补：`npm i -D @vitest/coverage-v8`（新增 devDep，随 commit 提交 package.json + package-lock.json）。
+> ② `playwright.config.ts` 实际 `testDir="./__tests__/e2e"`、无 webServer（计划称"已含 webServer 启动"不实）→ 改 `testDir="./e2e"`（与计划 e2e 文件位置一致）+ 补 `webServer`（`npm run dev`，url `http://localhost:3000`，reuseExistingServer 非 CI）。
+> ③ e2e 依赖本机 compose 栈（网关+三服务+user-service+`scripts/test-data`）— 本沙箱无 Docker → Steps 2-4 e2e 仅写不跑，环境性跳过（Task 8/10 同款先例），运行留给用户本机。
+> ④ e2e 登录账号 `admin@example.com/password`：user-service 现无该用户（`scripts/seed.py` 已从工作区删除，仅 git 历史 70a326ea 有 5 用户种子；`user_service.db` 空）→ e2e 内注明前置（用户本机需先建账号并跑 `seed_module_permissions.py` 赋权），账号补建不在本任务范围，收尾向用户说明。
+
 **Files:**
 - Create: `frontend/e2e/storefront.spec.ts`
 - Create: `frontend/e2e/admin.spec.ts`
-- Create: `frontend/playwright.config.ts`（已含 webServer 启动）
+- Modify: `frontend/playwright.config.ts`（testDir→`./e2e` + webServer）
+- Modify: `frontend/package.json` + `package-lock.json`（新增 `@vitest/coverage-v8` devDep）
 - Modify: 补充各页组件测试至覆盖率 ≥80%
 
 **Interfaces:**
