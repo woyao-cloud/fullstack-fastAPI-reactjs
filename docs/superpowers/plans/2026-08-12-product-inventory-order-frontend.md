@@ -2609,20 +2609,92 @@ git commit -m "feat(frontend): 我的订单列表 + 状态过滤"
 
 ### Task 13: 后台商品管理（列表 + 表单 + SKU 子表 + 启停）
 
+> **后端前置（plan-fix）**：调度前亲验源码发现三处契约缺口，全部补齐：
+> ① `ProductSearchRequest` 无 `status` 字段 → 原方案客户端过滤单页（brief 注释误称"后端返回全量"，实际只返回一页），状态筛选下分页错乱且后续页条目不可达；且"全部"须含 draft/inactive（现 search 硬编码 `status=active`）。补：search 增加 `status` 参数，`null/空→active`（商城默认不变）、`"all"→不过滤`（后台全部）、否则按值过滤。
+> ② `SkuRequest` 无 `isActive` 字段，`SpuWriteService.toSku` 硬编码 `setActive(true)` → 表单的 isActive 勾选在 create/update 上无效。补：`SkuRequest` 加 `Boolean isActive`，`toSku` 用 `r.isActive() == null || r.isActive()`。
+> ③ `ProductListContent` 用 `useSearchParams` 但默认导出未包 `<Suspense>` → Next 16 静态预渲染报错（Task 8 同款教训）。补：Suspense 包裹。
+
 **Files:**
+- Modify: `product-service/src/main/java/com/product/dto/request/ProductSearchRequest.java`（加 status）
+- Modify: `product-service/src/main/java/com/product/service/read/ProductQueryService.java`（search 状态过滤）
+- Modify: `product-service/src/main/java/com/product/dto/request/SkuRequest.java`（加 isActive）
+- Modify: `product-service/src/main/java/com/product/service/write/SpuWriteService.java`（toSku 用 isActive）
+- Modify: `frontend/lib/api/products.ts`（ProductSearchParams 加 status?）
 - Create: `frontend/app/admin/page.tsx`（仪表板：重定向到商品）
 - Create: `frontend/app/admin/products/page.tsx`
 - Create: `frontend/app/admin/products/new/page.tsx`
 - Create: `frontend/app/admin/products/[id]/page.tsx`
 - Create: `frontend/components/admin/sku-editor.tsx`
+- Create: `frontend/components/admin/spu-form.tsx`（Step 3 引用，Files 清单原漏）
 - Create: `frontend/lib/schemas/spu.ts`（zod 对齐后端 `@Valid`）
 - Test: `frontend/__tests__/lib/schemas/spu.test.ts`
 
 **Interfaces:**
 - Consumes: `productsApi.search/detail/create/update/changeStatus/remove`、`categoriesApi.tree`、`brandsApi.list`、`SpuCreateRequest`、`SpuStatus` 小写枚举
 - Produces: 商品列表（搜索/状态筛选/分页 + 启停/删除按钮）、SPU 表单（基本信息 + SKU 动态子表）、zod schema
+- **后端契约变更**：`GET /api/v1/products/search` 新增可选 `status`（`all|draft|active|inactive`，缺省 active）；`SpuCreateRequest.skus[].isActive` 生效（此前被忽略恒 true）。
 
-- [ ] **Step 1: `lib/schemas/spu.ts`**
+- [ ] **Step 1（后端）: search 状态过滤 + SkuRequest.isActive**
+
+Modify `product-service/src/main/java/com/product/dto/request/ProductSearchRequest.java`:
+
+```java
+public record ProductSearchRequest(
+        String q,
+        String category,
+        String brand,
+        String minPrice,
+        String maxPrice,
+        String sort,
+        String status,
+        int page,
+        int size
+) { ... }
+```
+
+Modify `product-service/src/main/java/com/product/service/read/ProductQueryService.java` search 规格（替换硬编码 active 行）:
+
+```java
+// 状态过滤: null/空→active(商城默认); "all"→不过滤(后台全部); 否则按值
+String statusRaw = req.status();
+SpuStatus status = null;
+if (statusRaw == null || statusRaw.isBlank() || "active".equalsIgnoreCase(statusRaw)) {
+    status = SpuStatus.active;
+} else if (!"all".equalsIgnoreCase(statusRaw)) {
+    status = SpuStatus.valueOf(statusRaw.toLowerCase());
+}
+if (status != null) {
+    ps.add(cb.equal(root.get("status"), status));
+}
+```
+
+Modify `product-service/src/main/java/com/product/dto/request/SkuRequest.java`（加字段）:
+
+```java
+public record SkuRequest(
+        @NotNull Map<String, String> specs,
+        @NotNull @Positive BigDecimal price,
+        @NotBlank @Size(max = 50) String skuCode,
+        String barCode,
+        BigDecimal weight,
+        List<String> images,
+        Boolean isActive
+) {}
+```
+
+Modify `product-service/src/main/java/com/product/service/write/SpuWriteService.java` `toSku`（替换硬编码行）:
+
+```java
+sku.setActive(r.isActive() == null || r.isActive());
+```
+
+Run（在 `product-service/` 下）:
+```bash
+mvn -q test
+```
+Expected: 通过。
+
+- [ ] **Step 2: `lib/schemas/spu.ts`**
 
 ```ts
 import { z } from "zod";
@@ -2652,11 +2724,11 @@ export const spuSchema = z.object({
 export type SpuFormValues = z.infer<typeof spuSchema>;
 ```
 
-- [ ] **Step 2: 商品列表 `admin/products/page.tsx`**
+- [ ] **Step 3: 商品列表 `admin/products/page.tsx`（先改 `frontend/lib/api/products.ts`: `ProductSearchParams` 加 `status?: string`）**
 
 ```tsx
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -2683,9 +2755,9 @@ function ProductListContent() {
   const [data, setData] = useState<PageResponse<SpuResponse> | null>(null);
 
   useEffect(() => {
-    // 注: 若 ProductQueryService.search 不支持 status 过滤, 后端返回全量, 此处按当前页客户端过滤
-    const params: ProductSearchParams & { status?: SpuStatus } = {
-      q: q || undefined, page, size: 10, ...(status ? { status } : {}),
+    // 后端按 status 过滤并分页(Step 1 契约): 空→"all" 全部, 否则按值
+    const params: ProductSearchParams = {
+      q: q || undefined, page, size: 10, status: status || "all",
     };
     productsApi.search(params).then((r) => setData(r.data)).catch(() => setData(null));
   }, [sp]);
@@ -2715,8 +2787,6 @@ function ProductListContent() {
     go({});
   };
 
-  const shown = status ? (data?.items.filter((p) => p.status === status) ?? []) : (data?.items ?? []);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -2733,7 +2803,7 @@ function ProductListContent() {
           <th className="py-2">名称</th><th>分类</th><th>状态</th><th className="text-right">操作</th>
         </tr></thead>
         <tbody>
-          {shown.map((p) => (
+          {data?.items.map((p) => (
             <tr key={p.id} className="border-b">
               <td className="py-2"><Link href={`/admin/products/${p.id}`} className="hover:underline">{p.name}</Link></td>
               <td>{p.category?.name ?? "—"}</td>
@@ -2748,7 +2818,7 @@ function ProductListContent() {
           ))}
         </tbody>
       </table>
-      {shown.length === 0 && <p className="text-muted-foreground">暂无商品</p>}
+      {data && data.items.length === 0 && <p className="text-muted-foreground">暂无商品</p>}
       {data && data.total > data.size && (
         <div className="flex items-center justify-center gap-4">
           <Button variant="outline" size="sm" disabled={page <= 0} onClick={() => goPage(page - 1)}>上一页</Button>
@@ -2767,21 +2837,23 @@ export default function AdminProductsPage() {
   return (
     <PermissionGuard code="product:manage">
       <h1 className="mb-4 text-xl font-semibold">商品管理</h1>
-      <ProductListContent />
+      <Suspense fallback={null}>
+        <ProductListContent />
+      </Suspense>
     </PermissionGuard>
   );
 }
 ```
 
-- [ ] **Step 3: SPU 表单 `products/new/page.tsx` 与 `products/[id]/page.tsx`**
+- [ ] **Step 4: SPU 表单 `products/new/page.tsx` 与 `products/[id]/page.tsx`**
 
 共用 `SpuForm`（放 `components/admin/spu-form.tsx`）：react-hook-form + zodResolver(spuSchema)；字段：name、categoryId（select 来自 `categoriesApi.tree`）、brandId（select 来自 `brandsApi.list`）、coverImage、images（逗号分隔输入）、specsTemplate（key/values 动态行）、tags（逗号分隔）、SKU 子表（`sku-editor` 动态行：specs 键值对、price、skuCode、barCode、weight、isActive）。编辑模式加载 `productsApi.detail(id)` 预填；提交 `create` 或 `update(id, req)`。`[id]/page.tsx` 额外显示 SKU 列表与状态切换按钮。
 
-- [ ] **Step 4: `components/admin/sku-editor.tsx`**
+- [ ] **Step 5: `components/admin/sku-editor.tsx`**
 
 受控组件：`value: SkuRow[]`、`onChange`；每行 = specs（动态 key/value 行）、price、skuCode、barCode、weight、isActive checkbox、删除按钮；底部"添加 SKU"按钮。类型 `SkuRow = z.infer<typeof skuSchema>`。
 
-- [ ] **Step 5: 写失败测试 `lib/schemas/spu.test.ts`**
+- [ ] **Step 6: 写失败测试 `lib/schemas/spu.test.ts`**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -2805,17 +2877,17 @@ describe("spu schema", () => {
 });
 ```
 
-- [ ] **Step 6: 运行确认失败**
+- [ ] **Step 7: 运行确认失败**
 
 Run: `cd frontend && npx vitest run __tests__/lib/schemas/spu.test.ts`
 Expected: 失败（schema 不存在）。
 
-- [ ] **Step 7: 运行通过 + 冒烟**
+- [ ] **Step 8: 运行通过 + 冒烟**
 
-Run: `cd frontend && npx vitest run`
+Run: `cd frontend && npx vitest run && npx tsc --noEmit`
 Expected: 通过。列表可搜/筛/启停/删除；表单新建/编辑可用。
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add frontend/app/'admin'/page.tsx frontend/app/'admin'/products/page.tsx frontend/app/'admin'/products/new/page.tsx frontend/app/'admin'/products/'[id]'/page.tsx frontend/components/admin/sku-editor.tsx frontend/components/admin/spu-form.tsx frontend/lib/schemas/spu.ts frontend/__tests__/lib/schemas/spu.test.ts
