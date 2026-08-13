@@ -21,4 +21,9 @@ describe("ProductCard", () => {
     render(<ProductCard product={{ ...spu, status: "draft" }} />);
     expect(screen.getByText("下架")).toBeInTheDocument();
   });
+
+  it("renders 0 price when no skus", () => {
+    render(<ProductCard product={{ ...spu, skus: [] }} />);
+    expect(screen.getByText(/¥0.00 起/)).toBeInTheDocument();
+  });
 });
