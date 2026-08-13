@@ -37,7 +37,8 @@ function LoginForm() {
     try {
       await login(data.email, data.password);
       toast.success("登录成功");
-      router.push(sp.get("redirect") ?? "/admin");
+      const target = sp.get("redirect");
+      router.push(target && target.startsWith("/") && !target.startsWith("//") ? target : "/admin");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "登录失败");
     } finally {
