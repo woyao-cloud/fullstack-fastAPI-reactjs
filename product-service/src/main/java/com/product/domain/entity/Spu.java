@@ -28,7 +28,9 @@ public class Spu {
     @JoinColumn(name = "brand_id")
     private Brand brand;
 
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    // 用 STRING 而非 NAMED_ENUM: Hibernate 6 按简单类名(SpuStatus)解析 PG 枚举类型名,
+    // 与 Flyway 建的 spu_status 不匹配会导致 ddl-auto:validate 启动失败(V7 迁移改为 VARCHAR)
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SpuStatus status = SpuStatus.draft;
 
